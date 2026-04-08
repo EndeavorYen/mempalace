@@ -40,6 +40,10 @@ def detect_language(text: str) -> str:
     if not text or not text.strip():
         return "unknown"
     ratio = get_chinese_ratio(text)
+    # Check if text has any alphabetic or CJK content at all
+    has_alpha_or_cjk = any(c.isalpha() or "\u4e00" <= c <= "\u9fff" for c in text)
+    if not has_alpha_or_cjk:
+        return "unknown"
     if ratio > 0.10:
         return "zh"
     elif ratio < 0.01:

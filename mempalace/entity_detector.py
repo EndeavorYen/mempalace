@@ -524,8 +524,9 @@ def extract_candidates(text: str) -> dict:
     Returns {name: frequency} for names appearing 3+ times (English)
     or 2+ times (Chinese).
     """
-    # Find all capitalized words (not at sentence start — harder, so we use frequency as filter)
-    raw = re.findall(r"\b([A-Z][a-z]{1,19})\b", text)
+    # Find all capitalized words. Use lookaround instead of \b to handle
+    # CJK-adjacent English words (e.g., "Simon和" — \b fails at ASCII-CJK boundary)
+    raw = re.findall(r"(?<![a-zA-Z])([A-Z][a-z]{1,19})(?![a-zA-Z])", text)
 
     counts = defaultdict(int)
     for word in raw:
@@ -533,7 +534,7 @@ def extract_candidates(text: str) -> dict:
             counts[word] += 1
 
     # Also find multi-word proper nouns (e.g. "Memory Palace", "Claude Code")
-    multi = re.findall(r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b", text)
+    multi = re.findall(r"(?<![a-zA-Z])([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)(?![a-zA-Z])", text)
     for phrase in multi:
         if not any(w.lower() in STOPWORDS for w in phrase.split()):
             counts[phrase] += 1

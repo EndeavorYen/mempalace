@@ -82,8 +82,12 @@ def config(tmp_dir, palace_path):
 @pytest.fixture
 def collection(palace_path):
     """A ChromaDB collection pre-seeded in the temp palace."""
+    from mempalace.config import get_embedding_function
+
     client = chromadb.PersistentClient(path=palace_path)
-    col = client.get_or_create_collection("mempalace_drawers")
+    col = client.get_or_create_collection(
+        "mempalace_drawers", embedding_function=get_embedding_function()
+    )
     return col
 
 
