@@ -219,32 +219,6 @@ ROOM_DESCRIPTIONS = {
     ),
 }
 
-# Fallback Chinese keywords (used when multilingual embedding model unavailable)
-_TOPIC_KEYWORDS_ZH_FALLBACK = {
-    "technical": [
-        "代码", "代碼", "程式", "函数", "函數", "错误", "錯誤",
-        "接口", "数据库", "資料庫", "服务器", "伺服器", "部署",
-        "测试", "測試", "调试", "調試", "重构", "重構",
-    ],
-    "architecture": [
-        "架构", "架構", "设计", "設計", "模式", "结构", "結構",
-        "模块", "模組", "组件", "元件", "服务", "服務",
-    ],
-    "planning": [
-        "计划", "計畫", "路线图", "路線圖", "里程碑", "截止日期",
-        "优先级", "優先級", "冲刺", "衝刺", "需求", "规格", "規格",
-    ],
-    "decisions": [
-        "决定", "決定", "选择", "選擇", "切换", "切換",
-        "迁移", "遷移", "替换", "替換", "权衡", "權衡",
-        "方案", "策略",
-    ],
-    "problems": [
-        "问题", "問題", "故障", "崩溃", "崩潰", "卡住",
-        "修复", "修復", "解决", "解決", "变通", "變通", "bug",
-    ],
-}
-
 # Cache for room description embeddings (computed once per session)
 _room_embeddings_cache = {}
 _multilingual_available = None
@@ -306,17 +280,11 @@ def detect_convo_room(content: str) -> str:
         except Exception:
             pass
 
-    # Fallback: keyword-based classification
+    # Fallback: keyword-based classification (English keywords only)
     content_lower = content[:3000].lower()
     scores = {}
     for room, keywords in TOPIC_KEYWORDS.items():
         score = sum(1 for kw in keywords if kw in content_lower)
-        if score > 0:
-            scores[room] = scores.get(room, 0) + score
-    # Also check Chinese keywords in fallback mode
-    content_snippet = content[:3000]
-    for room, keywords in _TOPIC_KEYWORDS_ZH_FALLBACK.items():
-        score = sum(1 for kw in keywords if kw in content_snippet)
         if score > 0:
             scores[room] = scores.get(room, 0) + score
     if scores:
