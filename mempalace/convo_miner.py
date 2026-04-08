@@ -17,6 +17,7 @@ from collections import defaultdict
 
 import chromadb
 
+from .config import MempalaceConfig, get_embedding_function
 from .normalize import normalize
 
 
@@ -193,14 +194,131 @@ TOPIC_KEYWORDS = {
 }
 
 
+# Room descriptions for embedding-based semantic classification.
+# Language-agnostic: the embedding model handles any input language.
+ROOM_DESCRIPTIONS = {
+    "technical": (
+        "programming, code, functions, bugs, errors, API, database, server, "
+        "deployment, testing, debugging, refactoring, software development"
+    ),
+    "architecture": (
+        "system architecture, software design, design patterns, structure, "
+        "schema, modules, components, services, layers, interfaces"
+    ),
+    "planning": (
+        "project planning, roadmap, milestones, deadlines, priorities, "
+        "sprints, backlog, scope, requirements, specifications"
+    ),
+    "decisions": (
+        "decisions, choices, trade-offs, switching, migrating, replacing, "
+        "alternatives, options, approaches, strategies, weighing pros and cons"
+    ),
+    "problems": (
+        "problems, issues, bugs, errors, crashes, failures, stuck, broken, "
+        "workarounds, fixes, solutions, root causes, troubleshooting"
+    ),
+}
+
+# Fallback Chinese keywords (used when multilingual embedding model unavailable)
+_TOPIC_KEYWORDS_ZH_FALLBACK = {
+    "technical": [
+        "代码", "代碼", "程式", "函数", "函數", "错误", "錯誤",
+        "接口", "数据库", "資料庫", "服务器", "伺服器", "部署",
+        "测试", "測試", "调试", "調試", "重构", "重構",
+    ],
+    "architecture": [
+        "架构", "架構", "设计", "設計", "模式", "结构", "結構",
+        "模块", "模組", "组件", "元件", "服务", "服務",
+    ],
+    "planning": [
+        "计划", "計畫", "路线图", "路線圖", "里程碑", "截止日期",
+        "优先级", "優先級", "冲刺", "衝刺", "需求", "规格", "規格",
+    ],
+    "decisions": [
+        "决定", "決定", "选择", "選擇", "切换", "切換",
+        "迁移", "遷移", "替换", "替換", "权衡", "權衡",
+        "方案", "策略",
+    ],
+    "problems": [
+        "问题", "問題", "故障", "崩溃", "崩潰", "卡住",
+        "修复", "修復", "解决", "解決", "变通", "變通", "bug",
+    ],
+}
+
+# Cache for room description embeddings (computed once per session)
+_room_embeddings_cache = {}
+_multilingual_available = None
+
+
+def _is_multilingual_model_available():
+    """Check if sentence-transformers is installed for multilingual embedding."""
+    global _multilingual_available
+    if _multilingual_available is None:
+        try:
+            import sentence_transformers  # noqa: F401
+            _multilingual_available = True
+        except ImportError:
+            _multilingual_available = False
+    return _multilingual_available
+
+
+def _cosine_similarity(a, b):
+    """Compute cosine similarity between two vectors."""
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = sum(x * x for x in a) ** 0.5
+    norm_b = sum(x * x for x in b) ** 0.5
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
+def _get_room_embeddings(ef):
+    """Get or compute cached room description embeddings."""
+    global _room_embeddings_cache
+    if not _room_embeddings_cache:
+        descriptions = list(ROOM_DESCRIPTIONS.values())
+        room_names = list(ROOM_DESCRIPTIONS.keys())
+        embeddings = ef(descriptions)
+        _room_embeddings_cache = dict(zip(room_names, embeddings))
+    return _room_embeddings_cache
+
+
 def detect_convo_room(content: str) -> str:
-    """Score conversation content against topic keywords."""
+    """Classify conversation content into a room using semantic similarity.
+
+    Uses embedding-based classification when available (language-agnostic).
+    Falls back to keyword matching if embedding is unavailable.
+    """
+    # Try embedding-based classification (language-agnostic)
+    if _is_multilingual_model_available():
+        try:
+            ef = get_embedding_function()
+            room_embs = _get_room_embeddings(ef)
+            content_emb = ef([content[:1000]])[0]
+            best_room = "general"
+            best_score = 0.3  # minimum threshold to avoid classifying noise
+            for room, room_emb in room_embs.items():
+                score = _cosine_similarity(content_emb, room_emb)
+                if score > best_score:
+                    best_room = room
+                    best_score = score
+            return best_room
+        except Exception:
+            pass
+
+    # Fallback: keyword-based classification
     content_lower = content[:3000].lower()
     scores = {}
     for room, keywords in TOPIC_KEYWORDS.items():
         score = sum(1 for kw in keywords if kw in content_lower)
         if score > 0:
-            scores[room] = score
+            scores[room] = scores.get(room, 0) + score
+    # Also check Chinese keywords in fallback mode
+    content_snippet = content[:3000]
+    for room, keywords in _TOPIC_KEYWORDS_ZH_FALLBACK.items():
+        score = sum(1 for kw in keywords if kw in content_snippet)
+        if score > 0:
+            scores[room] = scores.get(room, 0) + score
     if scores:
         return max(scores, key=scores.get)
     return "general"
@@ -214,10 +332,15 @@ def detect_convo_room(content: str) -> str:
 def get_collection(palace_path: str):
     os.makedirs(palace_path, exist_ok=True)
     client = chromadb.PersistentClient(path=palace_path)
+    ef = get_embedding_function()
     try:
-        return client.get_collection("mempalace_drawers")
+        return client.get_collection("mempalace_drawers", embedding_function=ef)
     except Exception:
-        return client.create_collection("mempalace_drawers")
+        return client.create_collection(
+            "mempalace_drawers",
+            embedding_function=ef,
+            metadata={"embedding_model": MempalaceConfig().embedding_model},
+        )
 
 
 def file_already_mined(collection, source_file: str) -> bool:

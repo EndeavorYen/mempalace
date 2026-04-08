@@ -117,6 +117,18 @@ _EMOTION_SIGNALS = {
     "satisf": "satis",
     "disappoint": "grief",
     "concern": "anx",
+    # === CHINESE EMOTION SIGNALS ===
+    "开心": "joy", "開心": "joy", "快乐": "joy", "快樂": "joy", "高兴": "joy", "高興": "joy",
+    "害怕": "fear", "恐惧": "fear", "恐懼": "fear",
+    "爱": "love", "愛": "love", "喜欢": "love", "喜歡": "love",
+    "生气": "rage", "生氣": "rage", "愤怒": "rage", "憤怒": "rage",
+    "难过": "grief", "難過": "grief", "悲伤": "grief", "悲傷": "grief",
+    "担心": "anx", "擔心": "anx", "焦虑": "anx", "焦慮": "anx",
+    "感恩": "grat", "感谢": "grat", "感謝": "grat",
+    "好奇": "curious",
+    "惊讶": "surprise", "驚訝": "surprise",
+    "骄傲": "convict", "驕傲": "convict",
+    "决定": "determ", "決定": "determ",
 }
 
 # Keywords that signal flags
@@ -155,6 +167,20 @@ _FLAG_SIGNALS = {
     "framework": "TECHNICAL",
     "server": "TECHNICAL",
     "config": "TECHNICAL",
+    # === CHINESE FLAG SIGNALS ===
+    "决定": "DECISION", "決定": "DECISION",
+    "选择": "DECISION", "選擇": "DECISION",
+    "切换": "DECISION", "切換": "DECISION",
+    "创建": "ORIGIN", "創建": "ORIGIN",
+    "创立": "ORIGIN", "創立": "ORIGIN",
+    "成立": "ORIGIN",
+    "核心": "CORE", "基本": "CORE",
+    "原则": "CORE", "原則": "CORE",
+    "转折点": "PIVOT", "轉折點": "PIVOT",
+    "突破": "PIVOT", "顿悟": "PIVOT", "頓悟": "PIVOT",
+    "架构": "TECHNICAL", "架構": "TECHNICAL",
+    "数据库": "TECHNICAL", "資料庫": "TECHNICAL",
+    "部署": "TECHNICAL",
 }
 
 # Common filler/stop words to strip from topic extraction
@@ -292,6 +318,21 @@ _STOP_WORDS = {
     "really",
     "want",
     "need",
+}
+
+# === CHINESE STOP WORDS ===
+_STOP_WORDS_ZH = {
+    "的", "了", "着", "过", "過", "把", "被", "和", "与", "與",
+    "或", "但", "而", "在", "从", "從", "到", "对", "對",
+    "向", "为", "為", "以", "就", "也", "都", "又",
+    "不", "没", "沒", "很", "太", "最", "更", "还", "還",
+    "再", "已", "正", "这", "這", "那", "哪",
+    "什么", "什麼", "怎么", "怎麼", "如何", "为什么", "為什麼",
+    "我", "你", "他", "她", "它", "我们", "我們", "你们", "你們",
+    "他们", "他們", "是", "有", "会", "會", "能", "可以",
+    "要", "想", "得", "个", "個", "些", "种", "種",
+    "只", "次", "件", "上", "下", "里", "裡", "中",
+    "前", "后", "後", "左", "右",
 }
 
 
@@ -456,6 +497,12 @@ class Dialect:
             if "_" in w or "-" in w or (any(c.isupper() for c in w[1:])):
                 if w_lower in freq:
                     freq[w_lower] += 2
+
+        # CJK tokenizer: extract CJK bigrams+ (2+ consecutive CJK characters)
+        cjk_words = re.findall(r"[\u4e00-\u9fff]{2,}", text)
+        for w in cjk_words:
+            if w not in _STOP_WORDS_ZH:
+                freq[w] = freq.get(w, 0) + 1
 
         ranked = sorted(freq.items(), key=lambda x: -x[1])
         return [w for w, _ in ranked[:max_topics]]

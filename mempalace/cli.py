@@ -31,7 +31,7 @@ import sys
 import argparse
 from pathlib import Path
 
-from .config import MempalaceConfig
+from .config import MempalaceConfig, get_embedding_function
 
 
 def cmd_init(args):
@@ -174,7 +174,7 @@ def cmd_repair(args):
     # Try to read existing drawers
     try:
         client = chromadb.PersistentClient(path=palace_path)
-        col = client.get_collection("mempalace_drawers")
+        col = client.get_collection("mempalace_drawers", embedding_function=get_embedding_function())
         total = col.count()
         print(f"  Drawers found: {total}")
     except Exception as e:
@@ -210,7 +210,11 @@ def cmd_repair(args):
 
     print("  Rebuilding collection...")
     client.delete_collection("mempalace_drawers")
-    new_col = client.create_collection("mempalace_drawers")
+    new_col = client.create_collection(
+        "mempalace_drawers",
+        embedding_function=get_embedding_function(),
+        metadata={"embedding_model": MempalaceConfig().embedding_model},
+    )
 
     filed = 0
     for i in range(0, len(all_ids), batch_size):
@@ -250,7 +254,7 @@ def cmd_compress(args):
     # Connect to palace
     try:
         client = chromadb.PersistentClient(path=palace_path)
-        col = client.get_collection("mempalace_drawers")
+        col = client.get_collection("mempalace_drawers", embedding_function=get_embedding_function())
     except Exception:
         print(f"\n  No palace found at {palace_path}")
         print("  Run: mempalace init <dir> then mempalace mine <dir>")
@@ -321,7 +325,11 @@ def cmd_compress(args):
     # Store compressed versions (unless dry-run)
     if not args.dry_run:
         try:
-            comp_col = client.get_or_create_collection("mempalace_compressed")
+            comp_col = client.get_or_create_collection(
+                "mempalace_compressed",
+                embedding_function=get_embedding_function(),
+                metadata={"embedding_model": MempalaceConfig().embedding_model},
+            )
             for doc_id, compressed, meta, stats in compressed_entries:
                 comp_meta = dict(meta)
                 comp_meta["compression_ratio"] = round(stats["ratio"], 1)

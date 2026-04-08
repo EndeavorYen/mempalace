@@ -168,6 +168,51 @@ ALL_MARKERS = {
     "emotional": EMOTION_MARKERS,
 }
 
+# === CHINESE MARKERS ===
+
+CHINESE_DECISION_MARKERS = [
+    r"我们决定", r"我們決定", r"选择了", r"選擇了", r"用.*代替", r"而不是",
+    r"权衡", r"權衡", r"利弊", r"方案", r"策略", r"架构", r"架構",
+    r"框架", r"配置为", r"配置為", r"设为", r"設為", r"因为", r"因為",
+]
+
+CHINESE_PREFERENCE_MARKERS = [
+    r"我偏好", r"我喜欢", r"我喜歡", r"总是用", r"總是用",
+    r"总是使用", r"總是使用", r"永远不要", r"永遠不要",
+    r"千万不要", r"千萬不要", r"我的习惯", r"我的習慣",
+    r"我的风格", r"我的風格", r"用.*而不用",
+    r"风格", r"風格", r"惯例", r"慣例",
+]
+
+CHINESE_MILESTONE_MARKERS = [
+    r"成功了", r"搞定了", r"终于", r"終於", r"突破", r"第一次",
+    r"发现了", r"發現了", r"原来是", r"原來是", r"关键是", r"關鍵是",
+    r"实现了", r"實現了", r"上线了", r"上線了",
+    r"发布", r"發布", r"部署了", r"版本",
+]
+
+CHINESE_PROBLEM_MARKERS = [
+    r"错误", r"錯誤", r"崩溃", r"崩潰", r"失败", r"失敗",
+    r"不工作", r"有问题", r"有問題", r"根本原因",
+    r"修复", r"修復", r"解决方案", r"解決方案",
+    r"变通方法", r"變通方法", r"bug",
+]
+
+CHINESE_EMOTION_MARKERS = [
+    r"爱", r"愛", r"害怕", r"骄傲", r"驕傲", r"开心", r"開心",
+    r"难过", r"難過", r"想念", r"感恩", r"生气", r"生氣",
+    r"担心", r"擔心", r"孤独", r"孤獨", r"美丽", r"美麗",
+    r"我觉得", r"我覺得", r"我不能", r"我希望", r"我需要",
+]
+
+ALL_MARKERS_ZH = {
+    "decision": CHINESE_DECISION_MARKERS,
+    "preference": CHINESE_PREFERENCE_MARKERS,
+    "milestone": CHINESE_MILESTONE_MARKERS,
+    "problem": CHINESE_PROBLEM_MARKERS,
+    "emotional": CHINESE_EMOTION_MARKERS,
+}
+
 
 # =============================================================================
 # SENTIMENT — for disambiguation
@@ -237,11 +282,31 @@ NEGATIVE_WORDS = {
 }
 
 
+POSITIVE_WORDS_ZH = {
+    "开心", "開心", "快乐", "快樂", "成功", "突破",
+    "解决", "解決", "完成", "喜欢", "喜歡", "爱", "愛",
+    "感恩", "骄傲", "驕傲",
+}
+
+NEGATIVE_WORDS_ZH = {
+    "错误", "錯誤", "崩溃", "崩潰", "失败", "失敗",
+    "问题", "問題", "故障", "糟糕", "困难", "困難",
+    "卡住", "恐慌",
+}
+
+
 def _get_sentiment(text: str) -> str:
     """Quick sentiment: 'positive', 'negative', or 'neutral'."""
     words = set(w.lower() for w in re.findall(r"\b\w+\b", text))
     pos = len(words & POSITIVE_WORDS)
     neg = len(words & NEGATIVE_WORDS)
+    # Also check Chinese sentiment words (substring matching)
+    for w in POSITIVE_WORDS_ZH:
+        if w in text:
+            pos += 1
+    for w in NEGATIVE_WORDS_ZH:
+        if w in text:
+            neg += 1
     if pos > neg:
         return "positive"
     elif neg > pos:
@@ -387,6 +452,12 @@ def extract_memories(text: str, min_confidence: float = 0.3) -> List[Dict]:
             score, _ = _score_markers(prose, markers)
             if score > 0:
                 scores[mem_type] = score
+
+        # Also score against Chinese markers
+        for mem_type, markers in ALL_MARKERS_ZH.items():
+            score, _ = _score_markers(prose, markers)
+            if score > 0:
+                scores[mem_type] = scores.get(mem_type, 0) + score
 
         if not scores:
             continue

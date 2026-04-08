@@ -23,7 +23,7 @@ import logging
 import hashlib
 from datetime import datetime
 
-from .config import MempalaceConfig
+from .config import MempalaceConfig, get_embedding_function, check_embedding_model_mismatch
 from .version import __version__
 from .searcher import search_memories
 from .palace_graph import traverse, find_tunnels, graph_stats
@@ -43,9 +43,16 @@ def _get_collection(create=False):
     """Return the ChromaDB collection, or None on failure."""
     try:
         client = chromadb.PersistentClient(path=_config.palace_path)
+        ef = get_embedding_function()
         if create:
-            return client.get_or_create_collection(_config.collection_name)
-        return client.get_collection(_config.collection_name)
+            return client.get_or_create_collection(
+                _config.collection_name,
+                embedding_function=ef,
+                metadata={"embedding_model": _config.embedding_model},
+            )
+        col = client.get_collection(_config.collection_name, embedding_function=ef)
+        check_embedding_model_mismatch(col)
+        return col
     except Exception:
         return None
 
