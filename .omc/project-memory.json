@@ -132,6 +132,12 @@
       "type": "file"
     },
     {
+      "path": "benchmarks/multilingual_benchmark.py",
+      "accessCount": 25,
+      "lastAccessed": 1775637197449,
+      "type": "file"
+    },
+    {
       "path": "mempalace/entity_detector.py",
       "accessCount": 23,
       "lastAccessed": 1775635324018,
@@ -201,6 +207,12 @@
       "path": "mempalace/mcp_server.py",
       "accessCount": 9,
       "lastAccessed": 1775629858249,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 8,
+      "lastAccessed": 1775637272133,
       "type": "file"
     },
     {
@@ -279,12 +291,6 @@
       "path": "tests/test_multilingual_integration.py",
       "accessCount": 2,
       "lastAccessed": 1775630557601,
-      "type": "file"
-    },
-    {
-      "path": "README.md",
-      "accessCount": 1,
-      "lastAccessed": 1775625864481,
       "type": "file"
     },
     {

@@ -29,7 +29,7 @@ Other memory systems try to fix this by letting AI decide what's worth rememberi
 
 <br>
 
-[Quick Start](#quick-start) · [The Palace](#the-palace) · [AAAK Dialect](#aaak-compression) · [Benchmarks](#benchmarks) · [MCP Tools](#mcp-server)
+[Quick Start](#quick-start) · [The Palace](#the-palace) · [Multilingual](#multilingual-support) · [AAAK Dialect](#aaak-compression) · [Benchmarks](#benchmarks) · [MCP Tools](#mcp-server)
 
 <br>
 
@@ -508,6 +508,78 @@ Two hooks for Claude Code that automatically save memories during work:
   }
 }
 ```
+
+---
+
+## Multilingual Support
+
+> **This fork adds full multilingual support** — the original MemPalace only works with English.
+
+MemPalace now understands, stores, retrieves, and classifies content in **any language** supported by the multilingual embedding model. Chinese (Simplified + Traditional) has deep pattern-level support; all other languages work via embedding-based semantic classification with zero configuration.
+
+### What's Different from the Original
+
+| Feature | Original MemPalace | This Fork |
+|---------|-------------------|-----------|
+| **Languages** | English only | 7+ languages tested |
+| **Room Classification** | English keyword matching | Embedding-based semantic classification (language-agnostic) |
+| **Entity Detection** | English regex (`\b[A-Z][a-z]+\b`) | + Chinese name patterns (百家姓 surnames, verb signals) |
+| **Memory Extraction** | English-only regex markers | + Chinese markers (simplified + traditional) |
+| **Spellcheck** | English only, corrupts CJK | Auto-skips non-English text |
+| **Embedding Model** | English-only (`all-MiniLM-L6-v2`) | Configurable, default multilingual |
+| **Simplified/Traditional** | N/A | Both supported, OpenCC-validated consistency |
+
+### Multilingual Benchmark — 98.5% (Grade A)
+
+Tested across **7 languages** with **122 test cases** across 6 dimensions:
+
+```
+Dimension                Score    Pass   Total   Languages Tested
+--------------------------------------------------------------------
+Language Detection     100.0%   38/38           zh-Hans, zh-Hant, en, fr, es, de, ja, ko
+Entity Detection       100.0%   10/10           zh-Hans, zh-Hant, en
+Room Classification    100.0%   31/31           zh-Hans, zh-Hant, en, fr, es, de, ja
+Memory Extraction       90.9%   10/11           zh-Hans, zh-Hant, en
+Search Quality         100.0%   14/14           zh-Hans, zh-Hant, en, fr, es, de, ja
+OpenCC Consistency     100.0%   18/18           zh-Hans ↔ zh-Hant
+--------------------------------------------------------------------
+OVERALL                 98.5%  121/122           Grade: A
+```
+
+<sub>Run the benchmark yourself: `python -m benchmarks.multilingual_benchmark --verbose`</sub>
+
+### How It Works
+
+**Embedding-based room classification** — Instead of maintaining keyword lists per language, we use the multilingual embedding model to semantically match content against room descriptions. New languages work with **zero configuration**:
+
+```python
+# French — zero keywords configured, works via semantic similarity
+detect_convo_room("Le code a un bug dans la base de données.")  # → "technical"
+
+# Spanish — same
+detect_convo_room("Decidimos migrar la arquitectura a microservicios.")  # → "decisions"
+
+# German — same
+detect_convo_room("Der Code hat einen Fehler in der Datenbankabfrage.")  # → "technical"
+```
+
+**Chinese-specific patterns** — For entity detection and memory extraction, Chinese has dedicated pattern support including 百家姓 surname matching, simplified/traditional verb signals, and bilingual keyword fallback when the multilingual model isn't installed.
+
+### Quick Setup
+
+```bash
+# Install with multilingual support
+pip install -e ".[multilingual]"
+
+# Mine Chinese conversations
+mempalace mine ~/my-chinese-convos/
+
+# Search in any language
+mempalace search "数据库架构设计"
+mempalace search "database architecture"
+```
+
+The multilingual embedding model (`paraphrase-multilingual-MiniLM-L12-v2`, ~120MB) downloads automatically on first use. **No GPU required** — runs on CPU in milliseconds.
 
 ---
 
