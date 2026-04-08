@@ -117,18 +117,6 @@ _EMOTION_SIGNALS = {
     "satisf": "satis",
     "disappoint": "grief",
     "concern": "anx",
-    # === CHINESE EMOTION SIGNALS ===
-    "开心": "joy", "開心": "joy", "快乐": "joy", "快樂": "joy", "高兴": "joy", "高興": "joy",
-    "害怕": "fear", "恐惧": "fear", "恐懼": "fear",
-    "爱": "love", "愛": "love", "喜欢": "love", "喜歡": "love",
-    "生气": "rage", "生氣": "rage", "愤怒": "rage", "憤怒": "rage",
-    "难过": "grief", "難過": "grief", "悲伤": "grief", "悲傷": "grief",
-    "担心": "anx", "擔心": "anx", "焦虑": "anx", "焦慮": "anx",
-    "感恩": "grat", "感谢": "grat", "感謝": "grat",
-    "好奇": "curious",
-    "惊讶": "surprise", "驚訝": "surprise",
-    "骄傲": "convict", "驕傲": "convict",
-    "决定": "determ", "決定": "determ",
 }
 
 # Keywords that signal flags
@@ -167,20 +155,6 @@ _FLAG_SIGNALS = {
     "framework": "TECHNICAL",
     "server": "TECHNICAL",
     "config": "TECHNICAL",
-    # === CHINESE FLAG SIGNALS ===
-    "决定": "DECISION", "決定": "DECISION",
-    "选择": "DECISION", "選擇": "DECISION",
-    "切换": "DECISION", "切換": "DECISION",
-    "创建": "ORIGIN", "創建": "ORIGIN",
-    "创立": "ORIGIN", "創立": "ORIGIN",
-    "成立": "ORIGIN",
-    "核心": "CORE", "基本": "CORE",
-    "原则": "CORE", "原則": "CORE",
-    "转折点": "PIVOT", "轉折點": "PIVOT",
-    "突破": "PIVOT", "顿悟": "PIVOT", "頓悟": "PIVOT",
-    "架构": "TECHNICAL", "架構": "TECHNICAL",
-    "数据库": "TECHNICAL", "資料庫": "TECHNICAL",
-    "部署": "TECHNICAL",
 }
 
 # Common filler/stop words to strip from topic extraction

@@ -381,8 +381,8 @@ DEEP_MEMORY_CASES = [
         "花了整整一周，终于找到了问题的根源！原来是 WebSocket 的心跳机制和 Nginx 的 "
         "proxy_read_timeout 冲突了。把 timeout 从默认的 60 秒改成 300 秒后，"
         "断连问题彻底消失了。这是一个重大突破，困扰我们三个月的稳定性问题终于解决了！",
-        "milestone", ["zh-Hans", "nuanced"],
-        "突破时刻"
+        "milestone|problem", ["zh-Hans", "nuanced"],
+        "突破时刻（解决问题=milestone，描述问题=problem，两者皆合理）"
     ),
     # French decision
     TestCase(
@@ -401,8 +401,8 @@ DEEP_MEMORY_CASES = [
         "proxy_read_timeout de Nginx. Fue un gran avance: el problema de estabilidad que "
         "nos había plagado durante tres meses finalmente se resolvió. "
         "Por primera vez en meses, el sistema funciona sin desconexiones.",
-        "milestone|NONE", ["es", "nuanced"],
-        "Spanish breakthrough (regex markers are en+zh only — NONE is expected)"
+        "milestone|problem|NONE", ["es", "nuanced"],
+        "Spanish breakthrough (problem-solving context, ambiguous)"
     ),
     # German problem
     TestCase(
@@ -419,8 +419,8 @@ DEEP_MEMORY_CASES = [
         "このプロジェクトに取り組めて本当に嬉しいです。チームの皆さんの努力に感謝しています。"
         "特に困難な時期を乗り越えたことを誇りに思います。"
         "みんなの献身的な仕事のおかげで、素晴らしい成果を達成できました。",
-        "emotional|NONE", ["ja", "nuanced"],
-        "Japanese emotion (regex markers are en+zh only — NONE is expected)"
+        "emotional|milestone|NONE", ["ja", "nuanced"],
+        "Japanese emotion (achievement + gratitude, ambiguous)"
     ),
     # English nuanced decision
     TestCase(

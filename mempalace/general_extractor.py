@@ -168,50 +168,6 @@ ALL_MARKERS = {
     "emotional": EMOTION_MARKERS,
 }
 
-# === CHINESE MARKERS ===
-
-CHINESE_DECISION_MARKERS = [
-    r"我们决定", r"我們決定", r"选择了", r"選擇了", r"用.*代替", r"而不是",
-    r"权衡", r"權衡", r"利弊", r"方案", r"策略", r"架构", r"架構",
-    r"框架", r"配置为", r"配置為", r"设为", r"設為", r"因为", r"因為",
-]
-
-CHINESE_PREFERENCE_MARKERS = [
-    r"我偏好", r"我喜欢", r"我喜歡", r"总是用", r"總是用",
-    r"总是使用", r"總是使用", r"永远不要", r"永遠不要",
-    r"千万不要", r"千萬不要", r"我的习惯", r"我的習慣",
-    r"我的风格", r"我的風格", r"用.*而不用",
-    r"风格", r"風格", r"惯例", r"慣例",
-]
-
-CHINESE_MILESTONE_MARKERS = [
-    r"成功了", r"搞定了", r"终于", r"終於", r"突破", r"第一次",
-    r"发现了", r"發現了", r"原来是", r"原來是", r"关键是", r"關鍵是",
-    r"实现了", r"實現了", r"上线了", r"上線了",
-    r"发布", r"發布", r"部署了", r"版本",
-]
-
-CHINESE_PROBLEM_MARKERS = [
-    r"错误", r"錯誤", r"崩溃", r"崩潰", r"失败", r"失敗",
-    r"不工作", r"有问题", r"有問題", r"根本原因",
-    r"修复", r"修復", r"解决方案", r"解決方案",
-    r"变通方法", r"變通方法", r"bug",
-]
-
-CHINESE_EMOTION_MARKERS = [
-    r"爱", r"愛", r"害怕", r"骄傲", r"驕傲", r"开心", r"開心",
-    r"难过", r"難過", r"想念", r"感恩", r"生气", r"生氣",
-    r"担心", r"擔心", r"孤独", r"孤獨", r"美丽", r"美麗",
-    r"我觉得", r"我覺得", r"我不能", r"我希望", r"我需要",
-]
-
-ALL_MARKERS_ZH = {
-    "decision": CHINESE_DECISION_MARKERS,
-    "preference": CHINESE_PREFERENCE_MARKERS,
-    "milestone": CHINESE_MILESTONE_MARKERS,
-    "problem": CHINESE_PROBLEM_MARKERS,
-    "emotional": CHINESE_EMOTION_MARKERS,
-}
 
 
 # =============================================================================
@@ -282,31 +238,11 @@ NEGATIVE_WORDS = {
 }
 
 
-POSITIVE_WORDS_ZH = {
-    "开心", "開心", "快乐", "快樂", "成功", "突破",
-    "解决", "解決", "完成", "喜欢", "喜歡", "爱", "愛",
-    "感恩", "骄傲", "驕傲",
-}
-
-NEGATIVE_WORDS_ZH = {
-    "错误", "錯誤", "崩溃", "崩潰", "失败", "失敗",
-    "问题", "問題", "故障", "糟糕", "困难", "困難",
-    "卡住", "恐慌",
-}
-
-
 def _get_sentiment(text: str) -> str:
     """Quick sentiment: 'positive', 'negative', or 'neutral'."""
     words = set(w.lower() for w in re.findall(r"\b\w+\b", text))
     pos = len(words & POSITIVE_WORDS)
     neg = len(words & NEGATIVE_WORDS)
-    # Also check Chinese sentiment words (substring matching)
-    for w in POSITIVE_WORDS_ZH:
-        if w in text:
-            pos += 1
-    for w in NEGATIVE_WORDS_ZH:
-        if w in text:
-            neg += 1
     if pos > neg:
         return "positive"
     elif neg > pos:
@@ -425,9 +361,87 @@ def _score_markers(text: str, markers: List[str]) -> Tuple[float, List[str]]:
 # =============================================================================
 
 
+# =============================================================================
+# EMBEDDING-BASED CLASSIFICATION (language-agnostic)
+# =============================================================================
+
+# Memory type descriptions for semantic matching.
+# The embedding model maps any language to the same vector space,
+# so these English descriptions work for Chinese, French, German, etc.
+MEMORY_TYPE_DESCRIPTIONS = {
+    "decision": (
+        "making a choice, deciding between options, trade-offs, "
+        "weighing alternatives, selecting an approach or technology"
+    ),
+    "preference": (
+        "personal preference, coding style, always do X, never do Y, "
+        "habitual choices, conventions, rules to follow"
+    ),
+    "milestone": (
+        "breakthrough, finally working, shipped, launched, deployed, "
+        "first time achieved, discovered something new, proof of concept"
+    ),
+    "problem": (
+        "bug, error, crash, failure, root cause, something broken, "
+        "troubleshooting, workaround, debugging"
+    ),
+    "emotional": (
+        "feelings, emotions, love, fear, pride, gratitude, vulnerability, "
+        "personal sentiment, happy, sad, worried, scared, thankful, "
+        "I feel, deeply moved, touched, heartfelt, emotional expression"
+    ),
+}
+
+_memory_emb_cache = {}
+
+
+def _get_memory_embeddings(ef):
+    """Get or compute cached memory type description embeddings."""
+    global _memory_emb_cache
+    if not _memory_emb_cache:
+        descriptions = list(MEMORY_TYPE_DESCRIPTIONS.values())
+        types = list(MEMORY_TYPE_DESCRIPTIONS.keys())
+        embeddings = ef(descriptions)
+        _memory_emb_cache = dict(zip(types, embeddings))
+    return _memory_emb_cache
+
+
+def _cosine_similarity(a, b):
+    """Compute cosine similarity between two vectors."""
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = sum(x * x for x in a) ** 0.5
+    norm_b = sum(x * x for x in b) ** 0.5
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
+def _is_multilingual_available():
+    """Check if sentence-transformers is installed."""
+    try:
+        import sentence_transformers  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def _score_embedding(prose: str, ef) -> Dict[str, float]:
+    """Score prose against memory type descriptions using embedding similarity."""
+    mem_embs = _get_memory_embeddings(ef)
+    prose_emb = ef([prose[:500]])[0]
+    return {
+        mem_type: _cosine_similarity(prose_emb, emb)
+        for mem_type, emb in mem_embs.items()
+    }
+
+
 def extract_memories(text: str, min_confidence: float = 0.3) -> List[Dict]:
     """
     Extract memories from a text string.
+
+    Uses embedding-based classification (language-agnostic) when available.
+    Falls back to regex markers (English only) when sentence-transformers
+    is not installed.
 
     Args:
         text: The text to extract from (any format).
@@ -436,6 +450,13 @@ def extract_memories(text: str, min_confidence: float = 0.3) -> List[Dict]:
     Returns:
         List of dicts: {"content": str, "memory_type": str, "chunk_index": int}
     """
+    # Determine classification method
+    use_embedding = _is_multilingual_available()
+    ef = None
+    if use_embedding:
+        from .config import get_embedding_function
+        ef = get_embedding_function()
+
     # Split into paragraphs (double newline or speaker-turn boundaries)
     paragraphs = _split_into_segments(text)
     memories = []
@@ -446,38 +467,42 @@ def extract_memories(text: str, min_confidence: float = 0.3) -> List[Dict]:
 
         prose = _extract_prose(para)
 
-        # Score against all types
-        scores = {}
-        for mem_type, markers in ALL_MARKERS.items():
-            score, _ = _score_markers(prose, markers)
-            if score > 0:
-                scores[mem_type] = score
-
-        # Also score against Chinese markers
-        for mem_type, markers in ALL_MARKERS_ZH.items():
-            score, _ = _score_markers(prose, markers)
-            if score > 0:
-                scores[mem_type] = scores.get(mem_type, 0) + score
+        if use_embedding and ef is not None:
+            # Embedding-based: language-agnostic, works for any language
+            scores = _score_embedding(prose, ef)
+            # Filter to scores above a minimum embedding threshold
+            scores = {k: v for k, v in scores.items() if v > 0.2}
+        else:
+            # Fallback: regex-based (English patterns only)
+            scores = {}
+            for mem_type, markers in ALL_MARKERS.items():
+                score, _ = _score_markers(prose, markers)
+                if score > 0:
+                    scores[mem_type] = score
 
         if not scores:
             continue
 
-        # Length bonus
-        if len(para) > 500:
-            length_bonus = 2
-        elif len(para) > 200:
-            length_bonus = 1
-        else:
-            length_bonus = 0
-
         max_type = max(scores, key=scores.get)
-        max_score = scores[max_type] + length_bonus
+        max_score = scores[max_type]
+
+        # Length bonus (regex mode only — embedding scores are already normalized)
+        if not use_embedding:
+            if len(para) > 500:
+                max_score += 2
+            elif len(para) > 200:
+                max_score += 1
 
         # Disambiguate
         max_type = _disambiguate(max_type, prose, scores)
 
         # Confidence
-        confidence = min(1.0, max_score / 5.0)
+        if use_embedding:
+            # Embedding scores are 0-1 cosine similarity
+            confidence = min(1.0, max_score * 3)  # scale: 0.33+ maps to 1.0
+        else:
+            confidence = min(1.0, max_score / 5.0)
+
         if confidence < min_confidence:
             continue
 
