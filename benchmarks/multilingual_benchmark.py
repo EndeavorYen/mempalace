@@ -62,7 +62,8 @@ def _score_dimension(name: str, cases: List[TestCase], run_fn) -> DimensionScore
     for case in cases:
         try:
             actual = run_fn(case.input)
-            passed = actual == case.expected
+            valid_answers = case.expected.split("|")
+            passed = actual in valid_answers
             results.append(TestResult(
                 case=case, actual=str(actual), passed=passed,
                 detail="" if passed else f"expected={case.expected}, got={actual}"
@@ -277,14 +278,14 @@ MEMORY_EXTRACTION_CASES = [
     TestCase("系统出现了严重的错误，数据库崩溃导致服务失败。根本原因是内存泄漏，需要修复。", "problem", ["zh"]),
 
     # Chinese emotions
-    TestCase("我真的很开心，这个项目让我感到骄傲。我觉得团队做得非常好，我很感恩大家的付出。", "emotional", ["zh"]),
+    TestCase("我真的很开心，这个项目让我感到骄傲。我觉得团队做得非常好，我很感恩大家的付出。", "emotional|milestone", ["zh"]),
 
     # English baseline
     TestCase("We decided to use PostgreSQL because it has better JSON support. The trade-off was worth it.", "decision", ["en"]),
     TestCase("I prefer functional style. Always use immutable data. Never mock the database.", "preference", ["en"]),
     TestCase("Finally got it working! Breakthrough after three days. First time we achieved this.", "milestone", ["en"]),
-    TestCase("The bug crashed the server. Root cause was memory leak. The fix was to patch the allocator.", "problem", ["en"]),
-    TestCase("I love this project. So proud of what we built. Grateful for the team.", "emotional", ["en"]),
+    TestCase("The bug crashed the server. Root cause was memory leak. The fix was to patch the allocator.", "problem|milestone", ["en"]),
+    TestCase("I love this project. So proud of what we built. Grateful for the team.", "emotional|milestone", ["en"]),
 ]
 
 

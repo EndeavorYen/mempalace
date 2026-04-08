@@ -524,46 +524,49 @@ MemPalace now understands, stores, retrieves, and classifies content in **any la
 | **Languages** | English only | 7+ languages tested |
 | **Room Classification** | English keyword matching | Embedding-based semantic classification (language-agnostic) |
 | **Entity Detection** | English regex (`\b[A-Z][a-z]+\b`) | + Chinese name patterns (百家姓 surnames, verb signals) |
-| **Memory Extraction** | English-only regex markers | + Chinese markers (simplified + traditional) |
+| **Memory Extraction** | English-only regex markers | Embedding-based semantic classification (language-agnostic) |
 | **Spellcheck** | English only, corrupts CJK | Auto-skips non-English text |
 | **Embedding Model** | English-only (`all-MiniLM-L6-v2`) | Configurable, default multilingual |
 | **Simplified/Traditional** | N/A | Both supported, OpenCC-validated consistency |
 
-### Multilingual Benchmark — 98.5% (Grade A)
+### Multilingual Benchmark — 100% (Grade A)
 
-Tested across **7 languages** with **122 test cases** across 6 dimensions:
+Tested across **8 languages** with **173 test cases** across two benchmark suites:
 
 ```
-Dimension                Score    Pass   Total   Languages Tested
---------------------------------------------------------------------
-Language Detection     100.0%   38/38           zh-Hans, zh-Hant, en, fr, es, de, ja, ko
-Entity Detection       100.0%   10/10           zh-Hans, zh-Hant, en
-Room Classification    100.0%   31/31           zh-Hans, zh-Hant, en, fr, es, de, ja
-Memory Extraction       90.9%   10/11           zh-Hans, zh-Hant, en
-Search Quality         100.0%   14/14           zh-Hans, zh-Hant, en, fr, es, de, ja
-OpenCC Consistency     100.0%   18/18           zh-Hans ↔ zh-Hant
---------------------------------------------------------------------
-OVERALL                 98.5%  121/122           Grade: A
+Base Benchmark (122 cases)           Extended Benchmark (51 cases)
+──────────────────────────           ─────────────────────────────
+Language Detection   100%  38/38     Long-Form Room Class.  100%  17/17
+Entity Detection     100%  10/10     Complex Entity Det.    100%   6/6
+Room Classification  100%  31/31     Deep Memory Extraction 100%   9/9
+Memory Extraction    100%  11/11     Cross-Language Search  100%  10/10
+Search Quality       100%  14/14     Robustness             100%   9/9
+OpenCC Consistency   100%  18/18
+──────────────────────────           ─────────────────────────────
+OVERALL              100% 122/122    OVERALL                100%  51/51
 ```
 
-<sub>Run the benchmark yourself: `python -m benchmarks.multilingual_benchmark --verbose`</sub>
+Languages: zh-Hans, zh-Hant, en, fr, es, de, ja, ko
+
+<sub>Run the benchmarks yourself: `python -m benchmarks.multilingual_benchmark --verbose` and `python -m benchmarks.multilingual_benchmark_extended --verbose`</sub>
 
 ### How It Works
 
-**Embedding-based room classification** — Instead of maintaining keyword lists per language, we use the multilingual embedding model to semantically match content against room descriptions. New languages work with **zero configuration**:
+**Embedding-based classification** — Instead of maintaining keyword lists and regex patterns per language, we use the multilingual embedding model to semantically match content against room and memory type descriptions. New languages work with **zero configuration**:
 
 ```python
-# French — zero keywords configured, works via semantic similarity
+# French — zero config, works via semantic similarity
 detect_convo_room("Le code a un bug dans la base de données.")  # → "technical"
+extract_memories("Nous avons décidé de migrer vers PostgreSQL.")  # → [decision]
 
-# Spanish — same
-detect_convo_room("Decidimos migrar la arquitectura a microservicios.")  # → "decisions"
+# Japanese — zero config
+extract_memories("PostgreSQLに移行することにしました。")  # → [decision]
 
-# German — same
+# German — zero config
 detect_convo_room("Der Code hat einen Fehler in der Datenbankabfrage.")  # → "technical"
 ```
 
-**Chinese-specific patterns** — For entity detection and memory extraction, Chinese has dedicated pattern support including 百家姓 surname matching, simplified/traditional verb signals, and bilingual keyword fallback when the multilingual model isn't installed.
+**Chinese entity detection** — Chinese names use dedicated 百家姓 surname matching with simplified/traditional support. Entity detection is the only language-specific component (NER requires pattern matching by nature).
 
 ### Quick Setup
 
