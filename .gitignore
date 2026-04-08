@@ -6,7 +6,5 @@ __pycache__/
 .pytest_cache/
 mempal.yaml
 
-# .omc — track specs/plans (valuable), ignore ephemeral state
-.omc/state/
-.omc/notepad.md
-.omc/logs/
+# .omc — development tool state, not project source
+.omc/
