@@ -8,3 +8,6 @@ mempal.yaml
 
 # .omc — development tool state, not project source
 .omc/
+
+# Benchmark reports — generated output, not source
+benchmarks/*_report*.json
