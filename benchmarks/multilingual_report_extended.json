@@ -1,0 +1,59 @@
+{
+  "benchmark": "extended_multilingual",
+  "overall_score": 100.0,
+  "grade": "A",
+  "total_passed": 51,
+  "total_tests": 51,
+  "languages": [
+    "zh-Hans",
+    "zh-Hant",
+    "en",
+    "fr",
+    "es",
+    "de",
+    "ja",
+    "ko"
+  ],
+  "dimensions": [
+    {
+      "name": "Long-Form Room Classification",
+      "score": 100.0,
+      "passed": 17,
+      "total": 17,
+      "duration_ms": 11169.2,
+      "failures": []
+    },
+    {
+      "name": "Complex Entity Detection",
+      "score": 100.0,
+      "passed": 6,
+      "total": 6,
+      "duration_ms": 3.6,
+      "failures": []
+    },
+    {
+      "name": "Deep Memory Extraction",
+      "score": 100.0,
+      "passed": 9,
+      "total": 9,
+      "duration_ms": 11.2,
+      "failures": []
+    },
+    {
+      "name": "Cross-Language Search",
+      "score": 100.0,
+      "passed": 10,
+      "total": 10,
+      "duration_ms": 1007.6,
+      "failures": []
+    },
+    {
+      "name": "Robustness",
+      "score": 100.0,
+      "passed": 9,
+      "total": 9,
+      "duration_ms": 195.9,
+      "failures": []
+    }
+  ]
+}
