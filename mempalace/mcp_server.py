@@ -2,7 +2,7 @@
 """
 MemPalace MCP Server — read/write palace access for Claude Code
 ================================================================
-Install: claude mcp add mempalace -- python -m mempalace.mcp_server
+Install: claude mcp add mempalace -- python -m mempalace.mcp_server [--palace /path/to/palace]
 
 Tools (read):
   mempalace_status          — total drawers, wing/room breakdown
@@ -22,6 +22,8 @@ Tools (session):
   session_list              — list projects with saved checkpoints
 """
 
+import argparse
+import os
 import sys
 import json
 import logging
@@ -38,12 +40,35 @@ import chromadb
 
 from .knowledge_graph import KnowledgeGraph
 
-_kg = KnowledgeGraph()
-
 logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stderr)
 logger = logging.getLogger("mempalace_mcp")
 
+
+def _parse_args():
+    parser = argparse.ArgumentParser(description="MemPalace MCP Server")
+    parser.add_argument(
+        "--palace",
+        metavar="PATH",
+        help="Path to the palace directory (overrides config file and env var)",
+    )
+    args, _ = parser.parse_known_args()
+    return args
+
+
+_args = _parse_args()
+
+if _args.palace:
+    os.environ["MEMPALACE_PALACE_PATH"] = os.path.abspath(_args.palace)
+
 _config = MempalaceConfig()
+if _args.palace:
+    _kg = KnowledgeGraph(db_path=os.path.join(_config.palace_path, "knowledge_graph.sqlite3"))
+else:
+    _kg = KnowledgeGraph()
+
+
+_client_cache = None
+_collection_cache = None
 
 # ==================== SESSION STATE ====================
 
@@ -77,19 +102,24 @@ def _list_projects() -> list:
 
 
 def _get_collection(create=False):
-    """Return the ChromaDB collection, or None on failure."""
+    """Return the ChromaDB collection, caching the client between calls."""
+    global _client_cache, _collection_cache
     try:
-        client = chromadb.PersistentClient(path=_config.palace_path)
+        if _client_cache is None:
+            _client_cache = chromadb.PersistentClient(path=_config.palace_path)
         ef = get_embedding_function()
         if create:
-            return client.get_or_create_collection(
+            _collection_cache = _client_cache.get_or_create_collection(
                 _config.collection_name,
                 embedding_function=ef,
                 metadata={"embedding_model": _config.embedding_model},
             )
-        col = client.get_collection(_config.collection_name, embedding_function=ef)
-        check_embedding_model_mismatch(col)
-        return col
+        elif _collection_cache is None:
+            _collection_cache = _client_cache.get_collection(
+                _config.collection_name, embedding_function=ef
+            )
+            check_embedding_model_mismatch(_collection_cache)
+        return _collection_cache
     except Exception:
         return None
 
@@ -300,19 +330,18 @@ def tool_add_drawer(
     if not col:
         return _no_palace()
 
-    # Duplicate check
-    dup = tool_check_duplicate(content, threshold=0.9)
-    if dup.get("is_duplicate"):
-        return {
-            "success": False,
-            "reason": "duplicate",
-            "matches": dup["matches"],
-        }
+    drawer_id = f"drawer_{wing}_{room}_{hashlib.md5(content.encode()).hexdigest()[:16]}"
 
-    drawer_id = f"drawer_{wing}_{room}_{hashlib.md5((content[:100] + datetime.now().isoformat()).encode()).hexdigest()[:16]}"
+    # Idempotency: if the deterministic ID already exists, return success as a no-op.
+    try:
+        existing = col.get(ids=[drawer_id])
+        if existing and existing["ids"]:
+            return {"success": True, "reason": "already_exists", "drawer_id": drawer_id}
+    except Exception:
+        pass
 
     try:
-        col.add(
+        col.upsert(
             ids=[drawer_id],
             documents=[content],
             metadatas=[
