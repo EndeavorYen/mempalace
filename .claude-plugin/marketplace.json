@@ -9,7 +9,7 @@
       "name": "mempalace",
       "source": "./.claude-plugin",
       "description": "AI memory system — mine projects and conversations into a searchable palace. 18 MCP tools, auto-save hooks, multilingual support.",
-      "version": "3.0.17",
+      "version": "3.0.18",
       "author": {
         "name": "milla-jovovich"
       }
