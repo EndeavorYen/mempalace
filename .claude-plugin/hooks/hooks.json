@@ -1,6 +1,16 @@
 {
-  "description": "MemPalace auto-save and pre-compact hooks",
+  "description": "MemPalace auto-save, pre-compact, and session-start hooks",
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/mempal-session-start-hook.sh"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [

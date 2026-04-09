@@ -5,10 +5,8 @@ MemPalace MCP Server — read/write palace access for Claude Code
 Install: claude mcp add mempalace -- python -m mempalace.mcp_server [--palace /path/to/palace]
 
 Tools (read):
-  mempalace_status          — total drawers, wing/room breakdown
-  mempalace_list_wings      — all wings with drawer counts
-  mempalace_list_rooms      — rooms within a wing
-  mempalace_get_taxonomy    — full wing → room → count tree
+  mempalace_status          — palace overview with graph + KG stats
+  mempalace_taxonomy        — full wing → room → count tree
   mempalace_search          — semantic search, optional wing/room filter
   mempalace_check_duplicate — check if content already exists before filing
 
@@ -141,6 +139,7 @@ def tool_status():
     count = col.count()
     wings = {}
     rooms = {}
+    room_wings = {}  # room -> set of wings (for lightweight graph stats)
     try:
         all_meta = col.get(include=["metadatas"], limit=10000)["metadatas"]
         for m in all_meta:
@@ -148,15 +147,34 @@ def tool_status():
             r = m.get("room", "unknown")
             wings[w] = wings.get(w, 0) + 1
             rooms[r] = rooms.get(r, 0) + 1
+            if r not in room_wings:
+                room_wings[r] = set()
+            room_wings[r].add(w)
     except Exception:
         pass
+
+    # Lightweight graph stats from already-fetched metadata (no second scan)
+    tunnel_rooms = [r for r, ws in room_wings.items() if len(ws) > 1]
+    total_edges = sum(len(ws) for ws in room_wings.values())
+
+    # KG stats (graceful on errors — disk issues, corruption, etc.)
+    kg_stats_data = None
+    try:
+        kg_stats_data = _kg.stats()
+    except Exception:
+        pass
+
     return {
         "total_drawers": count,
         "wings": wings,
         "rooms": rooms,
+        "graph": {
+            "total_rooms": len(room_wings),
+            "tunnel_rooms": len(tunnel_rooms),
+            "total_edges": total_edges,
+        },
+        "knowledge_graph": kg_stats_data,
         "palace_path": _config.palace_path,
-        "protocol": PALACE_PROTOCOL,
-        "aaak_dialect": AAAK_SPEC,
     }
 
 
@@ -245,14 +263,27 @@ def tool_get_taxonomy():
     return {"taxonomy": taxonomy}
 
 
-def tool_search(query: str, limit: int = 5, wing: str = None, room: str = None):
-    return search_memories(
+def tool_taxonomy():
+    """Unified taxonomy tool — returns full wing → room → count tree."""
+    return tool_get_taxonomy()
+
+
+def tool_search(query: str, limit: int = 5, wing: str = None, room: str = None,
+                snippet_len: int = 200):
+    result = search_memories(
         query,
         palace_path=_config.palace_path,
         wing=wing,
         room=room,
         n_results=limit,
     )
+    # Truncate search results for token efficiency (0 = full text)
+    if snippet_len > 0 and "results" in result:
+        for hit in result["results"]:
+            text = hit.get("text", "")
+            if len(text) > snippet_len:
+                hit["text"] = text[:snippet_len] + "..."
+    return result
 
 
 def tool_check_duplicate(content: str, threshold: float = 0.9):
@@ -720,31 +751,25 @@ def tool_session_list():
 
 # ==================== MCP PROTOCOL ====================
 
+# Deprecated tool names → new tool name (for helpful error messages)
+DEPRECATED_TOOLS = {
+    "mempalace_list_wings": "mempalace_taxonomy",
+    "mempalace_list_rooms": "mempalace_taxonomy",
+    "mempalace_get_taxonomy": "mempalace_taxonomy",
+    "mempalace_graph_stats": "mempalace_status",
+    "mempalace_kg_stats": "mempalace_status",
+}
+
 TOOLS = {
     "mempalace_status": {
-        "description": "Palace overview — total drawers, wing and room counts",
+        "description": "Palace overview with graph and knowledge graph stats. ON WAKE-UP: call this first. BEFORE RESPONDING about any person, project, or past event: call mempalace_kg_query or mempalace_search FIRST — verify, never guess. WHEN FACTS CHANGE: call mempalace_kg_invalidate on the old fact, mempalace_kg_add for the new one.",
         "input_schema": {"type": "object", "properties": {}},
         "handler": tool_status,
     },
-    "mempalace_list_wings": {
-        "description": "List all wings with drawer counts",
+    "mempalace_taxonomy": {
+        "description": "Full palace taxonomy: wing → room → drawer count. Use this to understand palace structure.",
         "input_schema": {"type": "object", "properties": {}},
-        "handler": tool_list_wings,
-    },
-    "mempalace_list_rooms": {
-        "description": "List rooms within a wing (or all rooms if no wing given)",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "wing": {"type": "string", "description": "Wing to list rooms for (optional)"},
-            },
-        },
-        "handler": tool_list_rooms,
-    },
-    "mempalace_get_taxonomy": {
-        "description": "Full taxonomy: wing → room → drawer count",
-        "input_schema": {"type": "object", "properties": {}},
-        "handler": tool_get_taxonomy,
+        "handler": tool_taxonomy,
     },
     "mempalace_get_aaak_spec": {
         "description": "Get the AAAK dialect specification — the compressed memory format MemPalace uses. Call this if you need to read or write AAAK-compressed memories.",
@@ -827,11 +852,6 @@ TOOLS = {
         },
         "handler": tool_kg_timeline,
     },
-    "mempalace_kg_stats": {
-        "description": "Knowledge graph overview: entities, triples, current vs expired facts, relationship types.",
-        "input_schema": {"type": "object", "properties": {}},
-        "handler": tool_kg_stats,
-    },
     "mempalace_traverse": {
         "description": "Walk the palace graph from a room. Shows connected ideas across wings — the tunnels. Like following a thread through the palace: start at 'chromadb-setup' in wing_code, discover it connects to wing_myproject (planning) and wing_user (feelings about it).",
         "input_schema": {
@@ -861,13 +881,8 @@ TOOLS = {
         },
         "handler": tool_find_tunnels,
     },
-    "mempalace_graph_stats": {
-        "description": "Palace graph overview: total rooms, tunnel connections, edges between wings.",
-        "input_schema": {"type": "object", "properties": {}},
-        "handler": tool_graph_stats,
-    },
     "mempalace_search": {
-        "description": "Semantic search. Returns verbatim drawer content with similarity scores.",
+        "description": "Semantic search. Returns drawer content with similarity scores.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -875,6 +890,7 @@ TOOLS = {
                 "limit": {"type": "integer", "description": "Max results (default 5)"},
                 "wing": {"type": "string", "description": "Filter by wing (optional)"},
                 "room": {"type": "string", "description": "Filter by room (optional)"},
+                "snippet_len": {"type": "integer", "description": "Max chars per result (default 200, 0=full text)"},
             },
             "required": ["query"],
         },
@@ -1054,6 +1070,14 @@ def handle_request(request):
         tool_name = params.get("name")
         tool_args = params.get("arguments", {})
         if tool_name not in TOOLS:
+            # Helpful redirect for deprecated/merged tool names
+            if tool_name in DEPRECATED_TOOLS:
+                new_name = DEPRECATED_TOOLS[tool_name]
+                return {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "error": {"code": -32601, "message": f"Tool '{tool_name}' has been merged into '{new_name}'. Please use '{new_name}' instead."},
+                }
             return {
                 "jsonrpc": "2.0",
                 "id": req_id,
@@ -1075,7 +1099,7 @@ def handle_request(request):
             return {
                 "jsonrpc": "2.0",
                 "id": req_id,
-                "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]},
+                "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2 if os.environ.get("MEMPALACE_DEBUG") else None)}]},
             }
         except Exception:
             logger.exception(f"Tool error in {tool_name}")

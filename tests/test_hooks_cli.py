@@ -185,13 +185,16 @@ def test_stop_hook_tracks_save_point(tmp_path):
 # --- hook_session_start ---
 
 
-def test_session_start_passes_through(tmp_path):
+def test_session_start_injects_wakeup(tmp_path):
     result = _capture_hook_output(
         hook_session_start,
         {"session_id": "test"},
         state_dir=tmp_path,
     )
-    assert result == {}
+    # SessionStart now auto-injects L0+L1 wake-up context
+    assert result["decision"] == "block"
+    assert "MemPalace Wake-Up Context" in result["reason"]
+    assert "mempalace_search" in result["reason"]
 
 
 # --- hook_precompact ---
