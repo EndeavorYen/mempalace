@@ -15,13 +15,20 @@ Tools (read):
 Tools (write):
   mempalace_add_drawer      — file verbatim content into a wing/room
   mempalace_delete_drawer   — remove a drawer by ID
+
+Tools (session):
+  session_checkpoint        — save session state before /clear
+  session_restore           — restore session context after /clear
+  session_list              — list projects with saved checkpoints
 """
 
 import sys
 import json
 import logging
 import hashlib
+import re
 from datetime import datetime
+from pathlib import Path
 
 from .config import MempalaceConfig, get_embedding_function, check_embedding_model_mismatch
 from .version import __version__
@@ -37,6 +44,36 @@ logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stderr)
 logger = logging.getLogger("mempalace_mcp")
 
 _config = MempalaceConfig()
+
+# ==================== SESSION STATE ====================
+
+_SESSIONS_DIR = Path.home() / ".mempalace" / "sessions"
+
+
+def _slugify_project(name: str) -> str:
+    """Normalize project name to lowercase slug."""
+    return re.sub(r"[^a-z0-9-]", "-", name.lower().strip()).strip("-")
+
+
+def _get_state_path(project: str) -> Path:
+    """Return path to project's state.md, creating dirs as needed."""
+    slug = _slugify_project(project)
+    path = _SESSIONS_DIR / slug
+    path.mkdir(parents=True, exist_ok=True)
+    return path / "state.md"
+
+
+def _list_projects() -> list:
+    """List projects with state files, sorted by most recently modified."""
+    if not _SESSIONS_DIR.exists():
+        return []
+    projects = []
+    for d in _SESSIONS_DIR.iterdir():
+        state = d / "state.md"
+        if d.is_dir() and state.exists():
+            projects.append({"project": d.name, "modified": state.stat().st_mtime})
+    projects.sort(key=lambda x: x["modified"], reverse=True)
+    return projects
 
 
 def _get_collection(create=False):
@@ -101,8 +138,9 @@ PALACE_PROTOCOL = """IMPORTANT — MemPalace Memory Protocol:
 1. ON WAKE-UP: Call mempalace_status to load palace overview + AAAK spec.
 2. BEFORE RESPONDING about any person, project, or past event: call mempalace_kg_query or mempalace_search FIRST. Never guess — verify.
 3. IF UNSURE about a fact (name, gender, age, relationship): say "let me check" and query the palace. Wrong is worse than slow.
-4. AFTER EACH SESSION: call mempalace_diary_write to record what happened, what you learned, what matters.
-5. WHEN FACTS CHANGE: call mempalace_kg_invalidate on the old fact, mempalace_kg_add for the new one.
+4. BEFORE ENDING A SESSION: call session_checkpoint to save your task state, progress, decisions, and memory triggers. This replaces manual diary writes for session continuity.
+5. TO RESUME AFTER /clear: call session_restore to reload state + wake-up context (~1100-1300 tokens).
+6. WHEN FACTS CHANGE: call mempalace_kg_invalidate on the old fact, mempalace_kg_add for the new one.
 
 This protocol ensures the AI KNOWS before it speaks. Storage is not memory — but storage + this protocol = memory."""
 
@@ -444,6 +482,213 @@ def tool_diary_read(agent_name: str, last_n: int = 10):
         return {"error": str(e)}
 
 
+# ==================== SESSION CHECKPOINT ====================
+
+
+def tool_session_checkpoint(
+    project: str,
+    current_task: str,
+    progress: str,
+    decisions: str = "",
+    memory_triggers: str = "",
+    next_steps: str = "",
+):
+    """
+    Save a session checkpoint: writes state.md (deterministic restore)
+    and a diary entry to ChromaDB (long-term accumulation with importance=8).
+    Call this before /clear to preserve session context.
+    """
+    slug = _slugify_project(project)
+    now = datetime.now()
+
+    # Build state.md content
+    sections = [
+        "# Session State",
+        f"Updated: {now.isoformat()}",
+        f"Project: {project}",
+        "",
+        "## Current Task",
+        current_task,
+    ]
+    if progress:
+        sections.extend(["", "## Progress", progress])
+    if decisions:
+        sections.extend(["", "## Key Decisions", decisions])
+    if memory_triggers:
+        sections.extend(["", "## Memory Triggers", memory_triggers])
+    if next_steps:
+        sections.extend(["", "## Next Steps", next_steps])
+
+    state_content = "\n".join(sections) + "\n"
+
+    # Write state.md (atomic: write to temp, rename)
+    state_path = _get_state_path(project)
+    tmp_path = state_path.with_suffix(".tmp")
+    try:
+        tmp_path.write_text(state_content, encoding="utf-8")
+        tmp_path.replace(state_path)
+    except Exception as e:
+        return {"success": False, "error": f"Failed to write state.md: {e}"}
+
+    # Write diary entry directly to ChromaDB with importance=8
+    col = _get_collection(create=True)
+    if not col:
+        return {
+            "success": True,
+            "state_written": True,
+            "diary_written": False,
+            "warning": "State saved but palace unavailable for diary entry",
+            "project": slug,
+            "state_path": str(state_path),
+        }
+
+    entry_id = f"checkpoint_{slug}_{now.strftime('%Y%m%d_%H%M%S')}_{hashlib.md5(current_task[:50].encode()).hexdigest()[:8]}"
+    diary_content = f"CHECKPOINT:{slug}|{current_task}|{progress[:200] if progress else ''}"
+
+    try:
+        col.add(
+            ids=[entry_id],
+            documents=[diary_content],
+            metadatas=[
+                {
+                    "wing": "wing_sessions",
+                    "room": "checkpoints",
+                    "hall": "hall_diary",
+                    "topic": "session_checkpoint",
+                    "type": "diary_entry",
+                    "project": slug,
+                    "importance": 8,
+                    "filed_at": now.isoformat(),
+                    "date": now.strftime("%Y-%m-%d"),
+                }
+            ],
+        )
+    except Exception as e:
+        return {
+            "success": True,
+            "state_written": True,
+            "diary_written": False,
+            "warning": f"State saved but diary write failed: {e}",
+            "project": slug,
+            "state_path": str(state_path),
+        }
+
+    token_estimate = len(state_content) // 4
+    logger.info(f"Session checkpoint: {slug} → {state_path} (~{token_estimate} tokens)")
+
+    return {
+        "success": True,
+        "state_written": True,
+        "diary_written": True,
+        "project": slug,
+        "state_path": str(state_path),
+        "token_estimate": token_estimate,
+        "timestamp": now.isoformat(),
+    }
+
+
+def tool_session_restore(project: str = None):
+    """
+    Restore session context: reads state.md + L0/L1 wake-up + recent checkpoints.
+    Call this at the start of a new session after /clear.
+    Total restore cost: ~1100-1300 tokens.
+    """
+    from .layers import MemoryStack
+
+    # Resolve project
+    if project:
+        slug = _slugify_project(project)
+    else:
+        projects = _list_projects()
+        if not projects:
+            return {"has_state": False, "projects": []}
+        slug = projects[0]["project"]
+
+    state_path = _SESSIONS_DIR / slug / "state.md"
+    if not state_path.exists():
+        return {
+            "has_state": False,
+            "project": slug,
+            "projects": [p["project"] for p in _list_projects()],
+        }
+
+    # Read state.md
+    try:
+        state_content = state_path.read_text(encoding="utf-8")
+    except Exception as e:
+        return {"has_state": False, "error": f"Failed to read state.md: {e}"}
+
+    # Wake-up (L0+L1, capped at ~800 tokens by Layer1.MAX_CHARS)
+    try:
+        stack = MemoryStack()
+        wake_up_text = stack.wake_up()
+    except Exception:
+        wake_up_text = ""
+
+    # Recent checkpoint diary entries
+    recent_checkpoints = []
+    col = _get_collection()
+    if col:
+        try:
+            results = col.get(
+                where={"$and": [{"wing": "wing_sessions"}, {"room": "checkpoints"}]},
+                include=["documents", "metadatas"],
+                limit=10000,
+            )
+            if results["ids"]:
+                entries = []
+                for doc, meta in zip(results["documents"], results["metadatas"]):
+                    entries.append(
+                        {"content": doc, "timestamp": meta.get("filed_at", "")}
+                    )
+                entries.sort(key=lambda x: x["timestamp"], reverse=True)
+                recent_checkpoints = [e["content"] for e in entries[:3]]
+        except Exception:
+            pass
+
+    # Extract memory triggers from state content
+    triggers = []
+    in_triggers = False
+    for line in state_content.splitlines():
+        if line.strip() == "## Memory Triggers":
+            in_triggers = True
+            continue
+        if in_triggers:
+            if line.startswith("## "):
+                break
+            stripped = line.strip().lstrip("- ")
+            if stripped:
+                triggers.append(stripped)
+
+    total_text = state_content + wake_up_text + " ".join(recent_checkpoints)
+    token_estimate = len(total_text) // 4
+
+    return {
+        "has_state": True,
+        "project": slug,
+        "state": state_content,
+        "wake_up": wake_up_text,
+        "recent_checkpoints": recent_checkpoints,
+        "memory_triggers": triggers,
+        "token_estimate": token_estimate,
+    }
+
+
+def tool_session_list():
+    """List all projects with saved session state."""
+    projects = _list_projects()
+    return {
+        "projects": [
+            {
+                "project": p["project"],
+                "modified": datetime.fromtimestamp(p["modified"]).isoformat(),
+            }
+            for p in projects
+        ],
+        "count": len(projects),
+    }
+
+
 # ==================== MCP PROTOCOL ====================
 
 TOOLS = {
@@ -692,6 +937,58 @@ TOOLS = {
             "required": ["agent_name"],
         },
         "handler": tool_diary_read,
+    },
+    "session_checkpoint": {
+        "description": "Save a session checkpoint before /clear. Writes state.md (deterministic restore) + diary entry (long-term accumulation). Call this to preserve your current task, progress, decisions, and memory triggers for the next session.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "project": {
+                    "type": "string",
+                    "description": "Project name (will be slugified, e.g. 'My Project' → 'my-project')",
+                },
+                "current_task": {
+                    "type": "string",
+                    "description": "What you're currently working on",
+                },
+                "progress": {
+                    "type": "string",
+                    "description": "Markdown checklist of completed and remaining items",
+                },
+                "decisions": {
+                    "type": "string",
+                    "description": "Key decisions made this session and why (optional)",
+                },
+                "memory_triggers": {
+                    "type": "string",
+                    "description": "Keywords that should trigger mempalace_search in future sessions (optional)",
+                },
+                "next_steps": {
+                    "type": "string",
+                    "description": "What to do next when resuming (optional)",
+                },
+            },
+            "required": ["project", "current_task", "progress"],
+        },
+        "handler": tool_session_checkpoint,
+    },
+    "session_restore": {
+        "description": "Restore session context after /clear. Returns state.md + L0/L1 wake-up + recent checkpoints. Total cost: ~1100-1300 tokens. If no project specified, restores the most recently checkpointed project.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "project": {
+                    "type": "string",
+                    "description": "Project to restore (optional — defaults to most recently checkpointed)",
+                },
+            },
+        },
+        "handler": tool_session_restore,
+    },
+    "session_list": {
+        "description": "List all projects with saved session checkpoints, sorted by most recently modified.",
+        "input_schema": {"type": "object", "properties": {}},
+        "handler": tool_session_list,
     },
 }
 
