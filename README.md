@@ -29,7 +29,7 @@ Other memory systems try to fix this by letting AI decide what's worth rememberi
 
 <br>
 
-[Quick Start](#quick-start) · [The Palace](#the-palace) · [Multilingual](#multilingual-support) · [AAAK Dialect](#aaak-dialect-experimental) · [Benchmarks](#benchmarks) · [MCP Tools](#mcp-server)
+[Quick Start](#quick-start) · [Fork Features](#what-this-fork-adds) · [The Palace](#the-palace) · [AAAK Dialect](#aaak-dialect-experimental) · [Benchmarks](#benchmarks) · [MCP Tools](#mcp-server)
 
 <br>
 
@@ -86,9 +86,32 @@ Other memory systems try to fix this by letting AI decide what's worth rememberi
 
 ## Quick Start
 
-```bash
-pip install mempalace
+### Install (this fork)
 
+```bash
+# One-line install — clones, installs, registers MCP server
+curl -fsSL https://raw.githubusercontent.com/EndeavorYen/mempalace/main/install.sh | bash
+
+# Or from a local clone:
+git clone https://github.com/EndeavorYen/mempalace.git
+cd mempalace
+bash install.sh
+```
+
+```bash
+# Update to latest
+bash update.sh
+
+# Uninstall (keeps your palace data by default)
+bash uninstall.sh           # keeps ~/.mempalace/
+bash uninstall.sh --purge   # removes everything
+```
+
+> **Note:** `pip install mempalace` installs the original upstream version without multilingual support, session persistence, or token optimization. Use the install script above for the fork.
+
+### Usage
+
+```bash
 # Set up your world — who you work with, what your projects are
 mempalace init ~/projects/myapp
 
@@ -105,6 +128,154 @@ mempalace status
 ```
 
 Three mining modes: **projects** (code and docs), **convos** (conversation exports), and **general** (auto-classifies into decisions, preferences, milestones, problems, and emotional context). Everything stays on your machine.
+
+---
+
+## What This Fork Adds
+
+> **This fork extends MemPalace with multilingual support, session persistence, token optimization, and multi-harness plugin integration** — features not available in the original repo.
+
+### At a Glance
+
+| Feature | Original MemPalace | This Fork |
+|---------|-------------------|-----------|
+| **Languages** | English only | 8 languages tested (zh-Hans, zh-Hant, en, fr, es, de, ja, ko) |
+| **Room Classification** | English keyword matching | Embedding-based semantic classification (language-agnostic) |
+| **Session Persistence** | None — context lost on `/clear` | Save → clear → restore with ~1200 tokens |
+| **MCP Tools** | 22 tools | 18 tools (merged for lower token overhead) |
+| **Auto-Save** | None | Hooks on Stop (every 15 msgs) + PreCompact |
+| **Wake-Up** | Manual | Auto-injects L0+L1 on SessionStart |
+| **Plugin Support** | Manual MCP setup | Claude Code + Codex plugins with marketplace install |
+| **Gemini CLI** | Not supported | Documented integration with auto-save hooks |
+| **JSON Output** | Pretty-printed | Compact (saves ~40% tokens per response) |
+
+---
+
+### Multilingual Support
+
+The original MemPalace only works with English. This fork uses **embedding-based semantic classification** — new languages work with **zero configuration**.
+
+| Component | Original | This Fork |
+|-----------|----------|-----------|
+| **Entity Detection** | English regex (`\b[A-Z][a-z]+\b`) | + Chinese name patterns (百家姓 surnames, verb signals) |
+| **Memory Extraction** | English-only regex markers | Embedding-based semantic classification |
+| **Spellcheck** | English only, corrupts CJK | Auto-skips non-English text |
+| **Embedding Model** | English-only (`all-MiniLM-L6-v2`) | Multilingual (`paraphrase-multilingual-MiniLM-L12-v2`) |
+| **Simplified/Traditional** | N/A | Both supported, OpenCC-validated consistency |
+
+**Benchmark — 100% (Grade A)** across 8 languages, 173 test cases:
+
+```
+Base Benchmark (122 cases)           Extended Benchmark (51 cases)
+──────────────────────────           ─────────────────────────────
+Language Detection   100%  38/38     Long-Form Room Class.  100%  17/17
+Entity Detection     100%  10/10     Complex Entity Det.    100%   6/6
+Room Classification  100%  31/31     Deep Memory Extraction 100%   9/9
+Memory Extraction    100%  11/11     Cross-Language Search  100%  10/10
+Search Quality       100%  14/14     Robustness             100%   9/9
+OpenCC Consistency   100%  18/18
+──────────────────────────           ─────────────────────────────
+OVERALL              100% 122/122    OVERALL                100%  51/51
+```
+
+```python
+# French — zero config, works via semantic similarity
+detect_convo_room("Le code a un bug dans la base de données.")  # → "technical"
+
+# Japanese — zero config
+extract_memories("PostgreSQLに移行することにしました。")  # → [decision]
+```
+
+```bash
+# Install with multilingual support
+pip install -e ".[multilingual]"
+
+# Search in any language
+mempalace search "数据库架构设计"
+mempalace search "database architecture"
+```
+
+The multilingual embedding model (~120MB) downloads automatically on first use. **No GPU required** — runs on CPU in milliseconds.
+
+<sub>Run the benchmarks yourself: `python -m benchmarks.multilingual_benchmark --verbose` and `python -m benchmarks.multilingual_benchmark_extended --verbose`</sub>
+
+---
+
+### Session Checkpoint / Restore
+
+Long AI sessions hit context limits. The standard fix — `/clear` — wipes everything. This fork adds a **save → clear → restore** cycle that preserves continuity at ~1200 tokens:
+
+```
+/save                  → saves current task, progress, decisions, memory triggers
+/clear                 → wipes context window
+/restore               → restores state + wake-up + recent checkpoints (~1200 tokens)
+```
+
+Three MCP tools power this:
+
+| Tool | What |
+|------|------|
+| `session_checkpoint` | Save state.md + diary entry before `/clear` |
+| `session_restore` | Restore state + L0/L1 wake-up + recent checkpoints |
+| `session_list` | List projects with saved checkpoints |
+
+State is stored as a deterministic file (`~/.mempalace/sessions/{project}/state.md`) — not in ChromaDB — so restore is exact, not semantic.
+
+---
+
+### Token Optimization
+
+Every MCP tool definition costs tokens in the AI's context window. This fork reduces overhead at three layers:
+
+**Tool consolidation (22 → 18 tools)** — overlapping tools merged:
+- `list_wings` + `list_rooms` + `get_taxonomy` → `mempalace_taxonomy`
+- `graph_stats` + `kg_stats` → folded into `mempalace_status`
+- Old tool names return helpful redirect messages via `DEPRECATED_TOOLS` map
+
+**Compact JSON output** — responses use single-line JSON instead of pretty-printed, saving ~40% tokens per tool response. Set `MEMPALACE_DEBUG=1` for readable output during development.
+
+**Search truncation** — `snippet_len=200` default trims drawer content in search results. Full content still retrievable by ID.
+
+---
+
+### Auto-Wake-Up & Auto-Save Hooks
+
+**SessionStart hook** — automatically injects L0 (identity) + L1 (essential story) into the conversation when it starts. No manual `mempalace wake-up` needed.
+
+**Stop hook** — every 15 exchanges, triggers a structured save: topics, decisions, quotes, code changes. Also regenerates the critical facts layer.
+
+**PreCompact hook** — fires before context compression. Emergency save before the window shrinks.
+
+```json
+{
+  "hooks": {
+    "SessionStart": [{"matcher": "", "hooks": [{"type": "command", "command": "mempal-session-start-hook.sh"}]}],
+    "Stop": [{"matcher": "", "hooks": [{"type": "command", "command": "mempal_save_hook.sh"}]}],
+    "PreCompact": [{"matcher": "", "hooks": [{"type": "command", "command": "mempal_precompact_hook.sh"}]}]
+  }
+}
+```
+
+**Optional auto-ingest:** Set the `MEMPAL_DIR` environment variable to a directory path and the hooks will automatically run `mempalace mine` on that directory during each save trigger (background on stop, synchronous on precompact).
+
+All hooks are pre-configured when installed as a plugin — no manual setup required.
+
+---
+
+### Plugin Support (Claude Code, Codex, Gemini CLI)
+
+**Claude Code** — native marketplace install:
+
+```bash
+claude plugin marketplace add milla-jovovich/mempalace
+claude plugin install --scope user mempalace
+```
+
+Includes hooks (SessionStart, Stop, PreCompact), slash commands (`/save`, `/restore`, `/save-clear`), and auto-pip-install on first load.
+
+**Codex CLI** — parallel plugin with dedicated hooks and marketplace metadata in `.codex-plugin/`.
+
+**Gemini CLI** — documented integration guide with MCP registration and PreCompress hook. See [examples/gemini_cli_setup.md](examples/gemini_cli_setup.md).
 
 ---
 
@@ -458,17 +629,15 @@ claude plugin install --scope user mempalace
 claude mcp add mempalace -- python -m mempalace.mcp_server
 ```
 
-### 19 Tools
+### 18 Tools
 
 **Palace (read)**
 
 | Tool | What |
 |------|------|
-| `mempalace_status` | Palace overview + AAAK spec + memory protocol |
-| `mempalace_list_wings` | Wings with counts |
-| `mempalace_list_rooms` | Rooms within a wing |
-| `mempalace_get_taxonomy` | Full wing → room → count tree |
-| `mempalace_search` | Semantic search with wing/room filters |
+| `mempalace_status` | Palace overview + graph stats + KG stats |
+| `mempalace_taxonomy` | Full wing → room → count tree (merged: list_wings + list_rooms + get_taxonomy) |
+| `mempalace_search` | Semantic search with wing/room filters and `snippet_len` truncation |
 | `mempalace_check_duplicate` | Check before filing |
 | `mempalace_get_aaak_spec` | AAAK dialect reference |
 
@@ -483,11 +652,10 @@ claude mcp add mempalace -- python -m mempalace.mcp_server
 
 | Tool | What |
 |------|------|
-| `mempalace_kg_query` | Entity relationships with time filtering |
-| `mempalace_kg_add` | Add facts |
+| `mempalace_kg_query` | Entity relationships with temporal `as_of` filtering |
+| `mempalace_kg_add` | Add facts with optional validity window |
 | `mempalace_kg_invalidate` | Mark facts as ended |
 | `mempalace_kg_timeline` | Chronological entity story |
-| `mempalace_kg_stats` | Graph overview |
 
 **Navigation**
 
@@ -495,7 +663,14 @@ claude mcp add mempalace -- python -m mempalace.mcp_server
 |------|------|
 | `mempalace_traverse` | Walk the graph from a room across wings |
 | `mempalace_find_tunnels` | Find rooms bridging two wings |
-| `mempalace_graph_stats` | Graph connectivity overview |
+
+**Session**
+
+| Tool | What |
+|------|------|
+| `session_checkpoint` | Save state before `/clear` |
+| `session_restore` | Restore state + wake-up after `/clear` |
+| `session_list` | List projects with saved checkpoints |
 
 **Agent Diary**
 
@@ -505,102 +680,6 @@ claude mcp add mempalace -- python -m mempalace.mcp_server
 | `mempalace_diary_read` | Read recent diary entries |
 
 The AI learns AAAK and the memory protocol automatically from the `mempalace_status` response. No manual configuration.
-
----
-
-## Auto-Save Hooks
-
-Two hooks for Claude Code that automatically save memories during work:
-
-**Save Hook** — every 15 messages, triggers a structured save. Topics, decisions, quotes, code changes. Also regenerates the critical facts layer.
-
-**PreCompact Hook** — fires before context compression. Emergency save before the window shrinks.
-
-```json
-{
-  "hooks": {
-    "Stop": [{"matcher": "", "hooks": [{"type": "command", "command": "/path/to/mempalace/hooks/mempal_save_hook.sh"}]}],
-    "PreCompact": [{"matcher": "", "hooks": [{"type": "command", "command": "/path/to/mempalace/hooks/mempal_precompact_hook.sh"}]}]
-  }
-}
-```
-
-**Optional auto-ingest:** Set the `MEMPAL_DIR` environment variable to a directory path and the hooks will automatically run `mempalace mine` on that directory during each save trigger (background on stop, synchronous on precompact).
-
----
-
-## Multilingual Support
-
-> **This fork adds full multilingual support** — the original MemPalace only works with English.
-
-MemPalace now understands, stores, retrieves, and classifies content in **any language** supported by the multilingual embedding model. Chinese (Simplified + Traditional) has deep pattern-level support; all other languages work via embedding-based semantic classification with zero configuration.
-
-### What's Different from the Original
-
-| Feature | Original MemPalace | This Fork |
-|---------|-------------------|-----------|
-| **Languages** | English only | 7+ languages tested |
-| **Room Classification** | English keyword matching | Embedding-based semantic classification (language-agnostic) |
-| **Entity Detection** | English regex (`\b[A-Z][a-z]+\b`) | + Chinese name patterns (百家姓 surnames, verb signals) |
-| **Memory Extraction** | English-only regex markers | Embedding-based semantic classification (language-agnostic) |
-| **Spellcheck** | English only, corrupts CJK | Auto-skips non-English text |
-| **Embedding Model** | English-only (`all-MiniLM-L6-v2`) | Configurable, default multilingual |
-| **Simplified/Traditional** | N/A | Both supported, OpenCC-validated consistency |
-
-### Multilingual Benchmark — 100% (Grade A)
-
-Tested across **8 languages** with **173 test cases** across two benchmark suites:
-
-```
-Base Benchmark (122 cases)           Extended Benchmark (51 cases)
-──────────────────────────           ─────────────────────────────
-Language Detection   100%  38/38     Long-Form Room Class.  100%  17/17
-Entity Detection     100%  10/10     Complex Entity Det.    100%   6/6
-Room Classification  100%  31/31     Deep Memory Extraction 100%   9/9
-Memory Extraction    100%  11/11     Cross-Language Search  100%  10/10
-Search Quality       100%  14/14     Robustness             100%   9/9
-OpenCC Consistency   100%  18/18
-──────────────────────────           ─────────────────────────────
-OVERALL              100% 122/122    OVERALL                100%  51/51
-```
-
-Languages: zh-Hans, zh-Hant, en, fr, es, de, ja, ko
-
-<sub>Run the benchmarks yourself: `python -m benchmarks.multilingual_benchmark --verbose` and `python -m benchmarks.multilingual_benchmark_extended --verbose`</sub>
-
-### How It Works
-
-**Embedding-based classification** — Instead of maintaining keyword lists and regex patterns per language, we use the multilingual embedding model to semantically match content against room and memory type descriptions. New languages work with **zero configuration**:
-
-```python
-# French — zero config, works via semantic similarity
-detect_convo_room("Le code a un bug dans la base de données.")  # → "technical"
-extract_memories("Nous avons décidé de migrer vers PostgreSQL.")  # → [decision]
-
-# Japanese — zero config
-extract_memories("PostgreSQLに移行することにしました。")  # → [decision]
-
-# German — zero config
-detect_convo_room("Der Code hat einen Fehler in der Datenbankabfrage.")  # → "technical"
-```
-
-**Chinese entity detection** — Chinese names use dedicated 百家姓 surname matching with simplified/traditional support. Entity detection is the only language-specific component (NER requires pattern matching by nature).
-
-### Quick Setup
-
-```bash
-# Install with multilingual support
-pip install -e ".[multilingual]"
-
-# Mine Chinese conversations
-mempalace mine ~/my-chinese-convos/
-
-# Search in any language
-mempalace search "数据库架构设计"
-mempalace search "database architecture"
-```
-
-The multilingual embedding model (`paraphrase-multilingual-MiniLM-L12-v2`, ~120MB) downloads automatically on first use. **No GPU required** — runs on CPU in milliseconds.
 
 ---
 
