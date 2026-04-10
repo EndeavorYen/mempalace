@@ -511,9 +511,9 @@ def tool_kg_add(
 ):
     """Add a relationship to the knowledge graph."""
     try:
-        subject = sanitize_name(subject, "subject")
-        predicate = sanitize_name(predicate, "predicate")
-        object = sanitize_name(object, "object")
+        subject = sanitize_content(subject, max_length=500)
+        predicate = sanitize_content(predicate, max_length=200)
+        object = sanitize_content(object, max_length=500)
     except ValueError as e:
         return {"success": False, "error": str(e)}
 
