@@ -238,7 +238,11 @@ PALACE_PROTOCOL = """IMPORTANT — MemPalace Memory Protocol:
 1. ON WAKE-UP: Call mempalace_status to load palace overview + AAAK spec.
 2. BEFORE RESPONDING about any person, project, or past event: call mempalace_kg_query or mempalace_search FIRST. Never guess — verify.
 3. IF UNSURE about a fact (name, gender, age, relationship): say "let me check" and query the palace. Wrong is worse than slow.
-4. BEFORE ENDING A SESSION: call session_checkpoint to save your task state, progress, decisions, and memory triggers. This replaces manual diary writes for session continuity.
+4. BEFORE ENDING A SESSION — archive knowledge, THEN checkpoint:
+   a. Save key decisions, external feedback, and technical discoveries as individual drawers (mempalace_add_drawer) — one topic per drawer for precise search later.
+   b. Save important structured facts as KG triples (mempalace_kg_add).
+   c. Write a diary entry summarizing the session (mempalace_diary_write).
+   d. LAST: call session_checkpoint to save task state, progress, and next steps for session continuity.
 5. TO RESUME AFTER /clear: call session_restore to reload state + wake-up context (~1100-1300 tokens).
 6. WHEN FACTS CHANGE: call mempalace_kg_invalidate on the old fact, mempalace_kg_add for the new one.
 

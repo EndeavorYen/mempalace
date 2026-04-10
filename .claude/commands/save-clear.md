@@ -9,10 +9,11 @@ Save the current session's state to mempalace, then clear context to free tokens
 
 ## What to do
 
-1. **Run the /save flow first** — introspect the session and call `session_checkpoint`:
-   - Determine project (from cwd, git repo, or ask)
-   - Summarize current task, progress, decisions, memory triggers, next steps
-   - Call `session_checkpoint(...)` with all fields
+1. **Run the /save flow first** — archive knowledge, then checkpoint:
+   - Archive key decisions and feedback as individual drawers (mempalace_add_drawer)
+   - Save structured facts as KG triples (mempalace_kg_add)
+   - Write a diary summary (mempalace_diary_write)
+   - Finally, call `session_checkpoint(...)` with task state and progress
 
 2. **Confirm the save succeeded** — show the user:
    - What was saved

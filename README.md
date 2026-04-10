@@ -202,25 +202,33 @@ The multilingual embedding model (~120MB) downloads automatically on first use. 
 
 ---
 
-### Session Checkpoint / Restore
+### Session Save / Restore
 
-Long AI sessions hit context limits. The standard fix — `/clear` — wipes everything. This fork adds a **save → clear → restore** cycle that preserves continuity at ~1200 tokens:
+Long AI sessions hit context limits. The standard fix — `/clear` — wipes everything. This fork adds a **save → clear → restore** cycle that preserves both continuity (~1200 tokens) and searchable knowledge:
 
 ```
-/save                  → saves current task, progress, decisions, memory triggers
+/save                  → archives knowledge to drawers/KG/diary, then checkpoints task state
 /clear                 → wipes context window
 /restore               → restores state + wake-up + recent checkpoints (~1200 tokens)
 ```
 
-Three MCP tools power this:
+**`/save` runs a two-phase archival:**
 
-| Tool | What |
-|------|------|
-| `session_checkpoint` | Save state.md + diary entry before `/clear` |
-| `session_restore` | Restore state + L0/L1 wake-up + recent checkpoints |
-| `session_list` | List projects with saved checkpoints |
+1. **Knowledge archival** — key decisions, external feedback, and discoveries are saved as individual drawers (`mempalace_add_drawer`), structured facts as KG triples (`mempalace_kg_add`), and a session narrative via `mempalace_diary_write`. Each topic gets its own drawer for precise semantic search later.
+2. **Task checkpoint** — current task, progress, decisions, and next steps are saved to `state.md` for deterministic restore.
 
-State is stored as a deterministic file (`~/.mempalace/sessions/{project}/state.md`) — not in ChromaDB — so restore is exact, not semantic.
+This separation matters: checkpoints tell you *where you left off*, drawers let you *search what you learned*.
+
+| Tool | Phase | What |
+|------|-------|------|
+| `mempalace_add_drawer` | Knowledge | Save decisions, feedback, discoveries (one per topic) |
+| `mempalace_kg_add` | Knowledge | Save structured facts as triples |
+| `mempalace_diary_write` | Knowledge | Write session narrative |
+| `session_checkpoint` | Task state | Save progress + next steps to `state.md` |
+| `session_restore` | Restore | Load state + L0/L1 wake-up + recent checkpoints |
+| `session_list` | Restore | List projects with saved checkpoints |
+
+Task state is stored as a deterministic file (`~/.mempalace/sessions/{project}/state.md`) — not in ChromaDB — so restore is exact, not semantic. Knowledge drawers are stored in ChromaDB and are searchable via `mempalace_search`.
 
 ---
 
@@ -243,9 +251,9 @@ Every MCP tool definition costs tokens in the AI's context window. This fork red
 
 **SessionStart hook** — automatically injects L0 (identity) + L1 (essential story) into the conversation when it starts. No manual `mempalace wake-up` needed.
 
-**Stop hook** — every 15 exchanges, triggers a structured save: topics, decisions, quotes, code changes. Also regenerates the critical facts layer.
+**Stop hook** — every 15 exchanges, triggers the full knowledge archival flow: save decisions and discoveries as individual drawers, structured facts as KG triples, diary summary, then session checkpoint.
 
-**PreCompact hook** — fires before context compression. Emergency save before the window shrinks.
+**PreCompact hook** — fires before context compression. Same archival flow as stop hook, but with urgency — this is the last chance before detailed context is lost.
 
 ```json
 {

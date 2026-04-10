@@ -18,18 +18,24 @@ SAVE_INTERVAL = 15
 STATE_DIR = Path.home() / ".mempalace" / "hook_state"
 
 STOP_BLOCK_REASON = (
-    "AUTO-SAVE checkpoint. Save key topics, decisions, quotes, and code "
-    "from this session to your memory system. Organize into appropriate "
-    "categories. Use verbatim quotes where possible. Continue conversation "
-    "after saving."
+    "AUTO-SAVE checkpoint. Archive this session's knowledge to MemPalace:\n"
+    "1. Save key decisions, external feedback, and discoveries as individual "
+    "drawers (mempalace_add_drawer) — one topic per drawer.\n"
+    "2. Save structured facts as KG triples (mempalace_kg_add).\n"
+    "3. Write a diary summary (mempalace_diary_write).\n"
+    "4. Finally, call session_checkpoint for task continuity.\n"
+    "Use verbatim quotes where possible. Continue conversation after saving."
 )
 
 PRECOMPACT_BLOCK_REASON = (
-    "COMPACTION IMMINENT. Save ALL topics, decisions, quotes, code, and "
-    "important context from this session to your memory system. Be thorough "
-    "\u2014 after compaction, detailed context will be lost. Organize into "
-    "appropriate categories. Use verbatim quotes where possible. Save "
-    "everything, then allow compaction to proceed."
+    "COMPACTION IMMINENT — detailed context will be lost. Archive EVERYTHING:\n"
+    "1. Save ALL decisions, feedback, discoveries as individual drawers "
+    "(mempalace_add_drawer) — one topic per drawer.\n"
+    "2. Save ALL structured facts as KG triples (mempalace_kg_add).\n"
+    "3. Write a thorough diary summary (mempalace_diary_write).\n"
+    "4. Finally, call session_checkpoint for task continuity.\n"
+    "Use verbatim quotes where possible. Be thorough — this is your last "
+    "chance before compaction. Save everything, then allow compaction to proceed."
 )
 
 
@@ -185,7 +191,7 @@ def hook_session_start(data: dict, harness: str):
             _output(
                 {
                     "decision": "block",
-                    "reason": f"[MemPalace Wake-Up Context]\n{wake_text}\n\nIMPORTANT: Before responding about any person, project, or past event, call mempalace_search or mempalace_kg_query FIRST. Before ending a session, call session_checkpoint.",
+                    "reason": f"[MemPalace Wake-Up Context]\n{wake_text}\n\nIMPORTANT: Before responding about any person, project, or past event, call mempalace_search or mempalace_kg_query FIRST. Before ending a session, archive knowledge to drawers (mempalace_add_drawer), KG triples (mempalace_kg_add), and diary (mempalace_diary_write), THEN call session_checkpoint.",
                 }
             )
             return
