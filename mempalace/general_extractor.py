@@ -284,6 +284,17 @@ def _disambiguate(memory_type: str, text: str, scores: Dict[str, float]) -> str:
         if scores.get("emotional", 0) > 0:
             return "emotional"
 
+    # Milestone with strong emotional signals => emotional
+    if memory_type == "milestone" and sentiment == "positive":
+        emotional_score = scores.get("emotional", 0)
+        milestone_score = scores.get("milestone", 0)
+        if emotional_score > 0.15 and (milestone_score - emotional_score) < 0.15:
+            # Check for explicit emotional language
+            emotional_words = {"feel", "love", "proud", "grateful", "happy", "thankful", "appreciate"}
+            lower = text.lower()
+            if sum(1 for w in emotional_words if w in lower) >= 2:
+                return "emotional"
+
     return memory_type
 
 
@@ -471,7 +482,7 @@ def extract_memories(text: str, min_confidence: float = 0.3) -> List[Dict]:
             # Embedding-based: language-agnostic, works for any language
             scores = _score_embedding(prose, ef)
             # Filter to scores above a minimum embedding threshold
-            scores = {k: v for k, v in scores.items() if v > 0.2}
+            scores = {k: v for k, v in scores.items() if v > 0.15}
         else:
             # Fallback: regex-based (English patterns only)
             scores = {}
