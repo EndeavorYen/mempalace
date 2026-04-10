@@ -80,7 +80,9 @@ class TestSessionCheckpoint:
         assert "embedding vs regex" in content
         assert "Run benchmarks" in content
 
-    def test_writes_diary_entry_with_importance(self, monkeypatch, config, palace_path, kg, tmp_dir, collection):
+    def test_writes_diary_entry_with_importance(
+        self, monkeypatch, config, palace_path, kg, tmp_dir, collection
+    ):
         _patch_mcp(monkeypatch, config, palace_path, kg, tmp_dir)
 
         result = tool_session_checkpoint(
@@ -208,7 +210,9 @@ class TestSessionRestore:
         assert result["has_state"] is False
         assert result["projects"] == []
 
-    def test_restore_latest_project(self, monkeypatch, config, palace_path, kg, tmp_dir, collection):
+    def test_restore_latest_project(
+        self, monkeypatch, config, palace_path, kg, tmp_dir, collection
+    ):
         _patch_mcp(monkeypatch, config, palace_path, kg, tmp_dir)
 
         tool_session_checkpoint(project="older", current_task="old", progress="old")
@@ -219,7 +223,9 @@ class TestSessionRestore:
         assert result["has_state"] is True
         assert result["project"] == "newer"
 
-    def test_restore_includes_wake_up(self, monkeypatch, config, palace_path, kg, tmp_dir, collection):
+    def test_restore_includes_wake_up(
+        self, monkeypatch, config, palace_path, kg, tmp_dir, collection
+    ):
         _patch_mcp(monkeypatch, config, palace_path, kg, tmp_dir)
 
         tool_session_checkpoint(project="wake", current_task="test", progress="test")
@@ -228,7 +234,9 @@ class TestSessionRestore:
         # wake_up should be a string (may be empty if no identity.txt)
         assert isinstance(result["wake_up"], str)
 
-    def test_restore_includes_recent_checkpoints(self, monkeypatch, config, palace_path, kg, tmp_dir, collection):
+    def test_restore_includes_recent_checkpoints(
+        self, monkeypatch, config, palace_path, kg, tmp_dir, collection
+    ):
         _patch_mcp(monkeypatch, config, palace_path, kg, tmp_dir)
 
         # Create multiple checkpoints
@@ -282,7 +290,9 @@ class TestSessionList:
 
 
 class TestFullCycle:
-    def test_checkpoint_restore_roundtrip(self, monkeypatch, config, palace_path, kg, tmp_dir, collection):
+    def test_checkpoint_restore_roundtrip(
+        self, monkeypatch, config, palace_path, kg, tmp_dir, collection
+    ):
         _patch_mcp(monkeypatch, config, palace_path, kg, tmp_dir)
 
         # Save
@@ -305,7 +315,9 @@ class TestFullCycle:
         assert "embedding model comparison" in result["memory_triggers"]
         assert result["token_estimate"] > 0
 
-    def test_checkpoint_diary_has_importance_8(self, monkeypatch, config, palace_path, kg, tmp_dir, collection):
+    def test_checkpoint_diary_has_importance_8(
+        self, monkeypatch, config, palace_path, kg, tmp_dir, collection
+    ):
         """Verify importance=8 lands in ChromaDB metadata for L1 scoring."""
         _patch_mcp(monkeypatch, config, palace_path, kg, tmp_dir)
 

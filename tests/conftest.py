@@ -14,6 +14,14 @@ import os
 import shutil
 import tempfile
 
+# ── Check for multilingual model availability ────────────────────────────
+try:
+    import sentence_transformers  # noqa: F401
+
+    HAS_MULTILINGUAL = True
+except ImportError:
+    HAS_MULTILINGUAL = False
+
 # ── Isolate HOME before any mempalace imports ──────────────────────────
 _original_env = {}
 _session_tmp = tempfile.mkdtemp(prefix="mempalace_session_")

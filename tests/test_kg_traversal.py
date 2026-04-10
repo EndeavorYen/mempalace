@@ -1,5 +1,4 @@
 """Tests for KG multi-hop traversal."""
-import pytest
 
 
 class TestTraverse:
@@ -8,15 +7,15 @@ class TestTraverse:
         result = graph_kg.traverse("Alice", depth=1)
         node_names = {n["name"] for n in result["nodes"]}
         assert "Alice" in node_names  # root node
-        assert "Acme" in node_names   # direct neighbor
-        assert "Bob" in node_names    # direct neighbor
+        assert "Acme" in node_names  # direct neighbor
+        assert "Bob" in node_names  # direct neighbor
         assert "NYC" not in node_names  # 2 hops away
 
     def test_traverse_depth_2(self, graph_kg):
         """Depth 2 returns 2-hop neighbors."""
         result = graph_kg.traverse("Alice", depth=2)
         node_names = {n["name"] for n in result["nodes"]}
-        assert "NYC" in node_names    # Alice->Acme->NYC
+        assert "NYC" in node_names  # Alice->Acme->NYC
         assert "Chess" in node_names  # Alice->Bob->Chess
         assert "Carol" in node_names  # Alice->Acme<-Carol (incoming to Acme)
 
@@ -32,7 +31,7 @@ class TestTraverse:
         result = graph_kg.traverse("Alice", depth=1, direction="outgoing")
         node_names = {n["name"] for n in result["nodes"]}
         assert "Acme" in node_names  # Alice->Acme
-        assert "Bob" in node_names   # Alice->Bob
+        assert "Bob" in node_names  # Alice->Bob
 
     def test_traverse_with_as_of_filter(self, graph_kg):
         """as_of should filter expired triples."""

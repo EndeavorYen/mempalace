@@ -215,6 +215,7 @@ def _is_multilingual_model_available():
     if _multilingual_available is None:
         try:
             import sentence_transformers  # noqa: F401
+
             _multilingual_available = True
         except ImportError:
             _multilingual_available = False
@@ -441,6 +442,7 @@ def mine_convos(
                     try:
                         from .kg_extraction import EntityTripleExtractor
                         from .knowledge_graph import KnowledgeGraph
+
                         kg_path = os.path.join(palace_path, "knowledge_graph.sqlite3")
                         extractor = EntityTripleExtractor(KnowledgeGraph(db_path=kg_path))
                         extractor.extract(chunk["content"], source_closet=drawer_id)

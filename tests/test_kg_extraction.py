@@ -1,4 +1,5 @@
 """Tests for KG entity/triple extraction."""
+
 import pytest
 from mempalace.kg_extraction import EntityTripleExtractor
 

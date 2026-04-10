@@ -177,11 +177,17 @@ def hook_session_start(data: dict, harness: str):
     # Auto-inject wake-up context (L0 identity + L1 essential story)
     try:
         from .layers import MemoryStack
+
         stack = MemoryStack()
         wake_text = stack.wake_up()
         if wake_text and wake_text.strip():
             _log(f"Injecting wake-up context ({len(wake_text)} chars)")
-            _output({"decision": "block", "reason": f"[MemPalace Wake-Up Context]\n{wake_text}\n\nIMPORTANT: Before responding about any person, project, or past event, call mempalace_search or mempalace_kg_query FIRST. Before ending a session, call session_checkpoint."})
+            _output(
+                {
+                    "decision": "block",
+                    "reason": f"[MemPalace Wake-Up Context]\n{wake_text}\n\nIMPORTANT: Before responding about any person, project, or past event, call mempalace_search or mempalace_kg_query FIRST. Before ending a session, call session_checkpoint.",
+                }
+            )
             return
     except Exception as e:
         _log(f"Wake-up failed (non-fatal): {e}")

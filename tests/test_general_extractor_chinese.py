@@ -3,7 +3,15 @@
 Embedding-based classification: works for any language without per-language config.
 """
 
-from mempalace.general_extractor import extract_memories
+import pytest
+from conftest import HAS_MULTILINGUAL
+
+pytestmark = pytest.mark.skipif(
+    not HAS_MULTILINGUAL,
+    reason="requires sentence-transformers (pip install mempalace[multilingual])",
+)
+
+from mempalace.general_extractor import extract_memories  # noqa: E402
 
 
 class TestChineseExtraction:
@@ -66,7 +74,9 @@ class TestGermanExtraction:
     """German has zero regex patterns — proves embedding-based approach works."""
 
     def test_german_problem(self):
-        text = "Das System stürzte mit einem kritischen Fehler ab. Die Ursache war ein Speicherleck."
+        text = (
+            "Das System stürzte mit einem kritischen Fehler ab. Die Ursache war ein Speicherleck."
+        )
         memories = extract_memories(text, min_confidence=0.1)
         types = [m["memory_type"] for m in memories]
         assert "problem" in types

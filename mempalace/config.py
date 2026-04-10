@@ -284,7 +284,7 @@ def _create_embedding_function(model_name: str, endpoint: str):
     """Create the appropriate embedding function based on model name prefix."""
     # Ollama provider: "ollama:<model-name>"
     if model_name.startswith("ollama:"):
-        ollama_model = model_name[len("ollama:"):]
+        ollama_model = model_name[len("ollama:") :]
         ollama_url = endpoint or DEFAULT_OLLAMA_URL
         try:
             from chromadb.utils.embedding_functions import OllamaEmbeddingFunction

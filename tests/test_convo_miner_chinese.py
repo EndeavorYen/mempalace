@@ -1,6 +1,14 @@
 """Tests for Chinese room classification in convo_miner."""
 
-from mempalace.convo_miner import detect_convo_room
+import pytest
+from conftest import HAS_MULTILINGUAL
+
+pytestmark = pytest.mark.skipif(
+    not HAS_MULTILINGUAL,
+    reason="requires sentence-transformers (pip install mempalace[multilingual])",
+)
+
+from mempalace.convo_miner import detect_convo_room  # noqa: E402
 
 
 class TestChineseRoomDetection:
