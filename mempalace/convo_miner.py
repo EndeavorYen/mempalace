@@ -466,6 +466,15 @@ def mine_convos(
                     ],
                 )
                 drawers_added += 1
+                if not dry_run:
+                    try:
+                        from .kg_extraction import EntityTripleExtractor
+                        from .knowledge_graph import KnowledgeGraph
+                        kg_path = os.path.join(palace_path, "knowledge_graph.sqlite3")
+                        extractor = EntityTripleExtractor(KnowledgeGraph(db_path=kg_path))
+                        extractor.extract(chunk["content"], source_closet=drawer_id)
+                    except Exception:
+                        pass  # KG extraction failure must never block ingest
             except Exception as e:
                 if "already exists" not in str(e).lower():
                     raise

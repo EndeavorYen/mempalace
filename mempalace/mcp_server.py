@@ -448,6 +448,23 @@ def tool_kg_stats():
     return _kg.stats()
 
 
+def tool_kg_extract(text: str, use_llm: str = "auto"):
+    """Extract entities and relationships from text into the knowledge graph."""
+    from .kg_extraction import EntityTripleExtractor
+    extractor = EntityTripleExtractor(_kg, use_llm=use_llm)
+    return extractor.extract(text)
+
+
+def tool_kg_traverse(entity: str, depth: int = 2, direction: str = "both", as_of: str = None):
+    """Walk the knowledge graph from an entity, discovering connected entities up to N hops away."""
+    return _kg.traverse(entity, depth=depth, direction=direction, as_of=as_of)
+
+
+def tool_kg_find_path(entity_a: str, entity_b: str, max_depth: int = 4):
+    """Find the shortest path between two entities in the knowledge graph."""
+    return _kg.find_path(entity_a, entity_b, max_depth=max_depth)
+
+
 # ==================== AGENT DIARY ====================
 
 
@@ -777,7 +794,7 @@ TOOLS = {
         "handler": tool_get_aaak_spec,
     },
     "mempalace_kg_query": {
-        "description": "Query the knowledge graph for an entity's relationships. Returns typed facts with temporal validity. E.g. 'Max' → child_of Alice, loves chess, does swimming. Filter by date with as_of to see what was true at a point in time.",
+        "description": "Query the knowledge graph for an entity's relationships. Returns typed facts with temporal validity. E.g. 'Max' → child_of Alice, loves chess, does swimming. Filter by date with as_of to see what was true at a point in time. For multi-hop queries, use mempalace_kg_traverse instead.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -851,6 +868,45 @@ TOOLS = {
             },
         },
         "handler": tool_kg_timeline,
+    },
+    "mempalace_kg_extract": {
+        "description": "Extract entities and relationships from text into the knowledge graph. Uses NER (local, free) with optional LLM upgrade. Feed it conversation snippets, meeting notes, or any text with people/orgs/events.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "Text to extract entities and relationships from"},
+                "use_llm": {"type": "string", "description": "LLM usage: 'auto' (use if API key available), 'always', 'never' (default: auto)"},
+            },
+            "required": ["text"],
+        },
+        "handler": tool_kg_extract,
+    },
+    "mempalace_kg_traverse": {
+        "description": "Walk the knowledge graph from an entity, discovering all connected entities within N hops. Returns nodes and edges as a subgraph.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "entity": {"type": "string", "description": "Starting entity name"},
+                "depth": {"type": "integer", "description": "How many hops to traverse (1-3, default: 2)"},
+                "direction": {"type": "string", "description": "outgoing, incoming, or both (default: both)"},
+                "as_of": {"type": "string", "description": "Date filter — only traverse facts valid at this date (YYYY-MM-DD)"},
+            },
+            "required": ["entity"],
+        },
+        "handler": tool_kg_traverse,
+    },
+    "mempalace_kg_find_path": {
+        "description": "Find the shortest path between two entities in the knowledge graph. Discovers how two people, orgs, or concepts are connected.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "entity_a": {"type": "string", "description": "Starting entity"},
+                "entity_b": {"type": "string", "description": "Target entity"},
+                "max_depth": {"type": "integer", "description": "Maximum path length to search (default: 4)"},
+            },
+            "required": ["entity_a", "entity_b"],
+        },
+        "handler": tool_kg_find_path,
     },
     "mempalace_traverse": {
         "description": "Walk the palace graph from a room. Shows connected ideas across wings — the tunnels. Like following a thread through the palace: start at 'chromadb-setup' in wing_code, discover it connects to wing_myproject (planning) and wing_user (feelings about it).",

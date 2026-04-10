@@ -191,3 +191,24 @@ def seeded_kg(kg):
     kg.add_triple("Alice", "works_at", "NewCo", valid_from="2025-01-01")
 
     return kg
+
+
+@pytest.fixture
+def graph_kg(tmp_path):
+    """KG with a richer graph for traversal tests."""
+    kg = KnowledgeGraph(db_path=str(tmp_path / "graph_test.sqlite3"))
+    # Create a multi-hop graph:
+    # Alice --works_at--> Acme --located_in--> NYC
+    # Alice --friends_with--> Bob --works_at--> Acme
+    # Bob --likes--> Chess
+    # Carol --works_at--> Acme
+    kg.add_triple("Alice", "works_at", "Acme")
+    kg.add_triple("Acme", "located_in", "NYC")
+    kg.add_triple("Alice", "friends_with", "Bob")
+    kg.add_triple("Bob", "works_at", "Acme")
+    kg.add_triple("Bob", "likes", "Chess")
+    kg.add_triple("Carol", "works_at", "Acme")
+    # Add a temporal triple (expired)
+    kg.add_triple("Alice", "works_at", "OldCorp", valid_from="2020-01-01")
+    kg.invalidate("Alice", "works_at", "OldCorp", ended="2023-06-01")
+    return kg
