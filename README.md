@@ -142,7 +142,8 @@ Three mining modes: **projects** (code and docs), **convos** (conversation expor
 | **Languages** | English only | 8 languages tested (zh-Hans, zh-Hant, en, fr, es, de, ja, ko) |
 | **Room Classification** | English keyword matching | Embedding-based semantic classification (language-agnostic) |
 | **Session Persistence** | None — context lost on `/clear` | Save → clear → restore with ~1200 tokens |
-| **MCP Tools** | 22 tools | 18 tools (merged for lower token overhead) |
+| **Knowledge Graph** | Manual triples only, single-hop queries | Auto-extraction (NER + LLM), multi-hop traversal, path finding |
+| **MCP Tools** | 22 tools | 21 tools (merged core + KG extraction/traversal/path) |
 | **Auto-Save** | None | Hooks on Stop (every 15 msgs) + PreCompact |
 | **Wake-Up** | Manual | Auto-injects L0+L1 on SessionStart |
 | **Plugin Support** | Manual MCP setup | Claude Code + Codex plugins with marketplace install |
@@ -569,11 +570,51 @@ kg.invalidate("Kai", "works_on", "Orion", ended="2026-03-01")
 
 Now queries for Kai's current work won't return Orion. Historical queries still will.
 
+### Auto-Extraction
+
+Feed text to the KG and let it extract entities and relationships automatically — no manual triple construction needed.
+
+```python
+from mempalace.kg_extraction import EntityTripleExtractor
+
+extractor = EntityTripleExtractor(kg)
+extractor.extract("Alice Chen joined Acme Corp as a senior engineer. She works with Bob on the payments team.")
+# → Entities: Alice Chen (person), Acme Corp (org), Bob (person)
+# → Triples: Alice Chen→joined→Acme Corp, Alice Chen→works_with→Bob
+```
+
+- **Zero-cost baseline**: Uses spaCy NER or regex fallback — no API key needed
+- **LLM upgrade**: Set `ANTHROPIC_API_KEY` and extraction automatically upgrades to Claude Haiku for semantic triples
+- **Ingest integration**: Extraction runs automatically when conversations are ingested via `mine_convos`
+
+Install NER support: `pip install mempalace[nlp] && python -m spacy download en_core_web_sm`
+
+### Multi-Hop Traversal
+
+Walk the graph beyond direct neighbors. Find how entities connect across multiple hops.
+
+```python
+# Discover everything within 2 hops of Alice
+kg.traverse("Alice", depth=2)
+# → nodes at depth 0 (Alice), depth 1 (Acme, Bob), depth 2 (payments team, ...)
+
+# How are Alice and Carol connected?
+kg.find_path("Alice", "Carol")
+# → Alice → works_at → Acme ← works_at ← Carol (length: 2)
+```
+
+- BFS traversal with depth cap (max 3 hops)
+- Shortest path finding between any two entities
+- Temporal filtering (`as_of`) and confidence thresholds on both
+
 | Feature | MemPalace | Zep (Graphiti) |
 |---------|-----------|----------------|
 | Storage | SQLite (local) | Neo4j (cloud) |
 | Cost | Free | $25/mo+ |
 | Temporal validity | Yes | Yes |
+| Auto-extraction | NER + optional LLM | LLM required |
+| Multi-hop traversal | BFS (depth 1-3) | BFS + community detection |
+| Entity resolution | Planned | LLM-based |
 | Self-hosted | Always | Enterprise only |
 | Privacy | Everything local | SOC 2, HIPAA |
 
@@ -629,7 +670,7 @@ claude plugin install --scope user mempalace
 claude mcp add mempalace -- python -m mempalace.mcp_server
 ```
 
-### 18 Tools
+### 21 Tools
 
 **Palace (read)**
 
@@ -656,6 +697,9 @@ claude mcp add mempalace -- python -m mempalace.mcp_server
 | `mempalace_kg_add` | Add facts with optional validity window |
 | `mempalace_kg_invalidate` | Mark facts as ended |
 | `mempalace_kg_timeline` | Chronological entity story |
+| `mempalace_kg_extract` | Auto-extract entities and triples from text (NER + optional LLM) |
+| `mempalace_kg_traverse` | Multi-hop BFS traversal from an entity (depth 1-3) |
+| `mempalace_kg_find_path` | Shortest path between two entities |
 
 **Navigation**
 
