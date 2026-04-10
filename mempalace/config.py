@@ -185,6 +185,14 @@ class MempalaceConfig:
         return self._file_config.get("embedding_model", DEFAULT_EMBEDDING_MODEL)
 
     @property
+    def embedding_endpoint(self):
+        """Ollama or custom embedding API endpoint URL."""
+        env_val = os.environ.get("MEMPALACE_EMBEDDING_ENDPOINT")
+        if env_val:
+            return env_val
+        return self._file_config.get("embedding_endpoint", "")
+
+    @property
     def language(self):
         """Language setting: 'auto', 'en', 'zh', etc."""
         env_val = os.environ.get("MEMPALACE_LANGUAGE")
@@ -232,6 +240,12 @@ class MempalaceConfig:
 
 _logger = logging.getLogger(__name__)
 
+# Cache embedding function to avoid re-loading the model on every call.
+# Key: (model_name, endpoint) tuple. Value: ChromaDB EmbeddingFunction instance.
+_embedding_fn_cache = {}
+
+DEFAULT_OLLAMA_URL = "http://localhost:11434"
+
 
 def get_embedding_function(model_name: str = None):
     """Get ChromaDB-compatible embedding function for the configured model.
@@ -239,18 +253,69 @@ def get_embedding_function(model_name: str = None):
     This is the SINGLE source of truth for embedding functions.
     All modules that access ChromaDB collections MUST import this.
 
-    Returns SentenceTransformerEmbeddingFunction or None (ChromaDB default fallback).
-    Logs a warning on fallback so users can diagnose missing multilingual support.
+    Supported model formats:
+        - "paraphrase-multilingual-MiniLM-L12-v2" — sentence-transformers (default)
+        - "ollama:qwen3-embedding-8b" — Ollama model via local API
+        - "ollama:nomic-embed-text" — any Ollama-hosted embedding model
+
+    When using "ollama:" prefix, set the endpoint via:
+        - MEMPALACE_EMBEDDING_ENDPOINT env var
+        - "embedding_endpoint" in config.json
+        - Defaults to http://localhost:11434
+
+    Returns a ChromaDB EmbeddingFunction instance. Falls back to ChromaDB default
+    if the requested provider is unavailable.
     """
+    config = MempalaceConfig()
     if model_name is None:
-        model_name = MempalaceConfig().embedding_model
+        model_name = config.embedding_model
+    endpoint = config.embedding_endpoint
+
+    cache_key = (model_name, endpoint)
+    if cache_key in _embedding_fn_cache:
+        return _embedding_fn_cache[cache_key]
+
+    ef = _create_embedding_function(model_name, endpoint)
+    _embedding_fn_cache[cache_key] = ef
+    return ef
+
+
+def _create_embedding_function(model_name: str, endpoint: str):
+    """Create the appropriate embedding function based on model name prefix."""
+    # Ollama provider: "ollama:<model-name>"
+    if model_name.startswith("ollama:"):
+        ollama_model = model_name[len("ollama:"):]
+        ollama_url = endpoint or DEFAULT_OLLAMA_URL
+        try:
+            from chromadb.utils.embedding_functions import OllamaEmbeddingFunction
+
+            _logger.info(f"Using Ollama embedding: model={ollama_model}, url={ollama_url}")
+            return OllamaEmbeddingFunction(url=ollama_url, model_name=ollama_model)
+        except ImportError:
+            _logger.warning(
+                "ChromaDB OllamaEmbeddingFunction not available. "
+                "Upgrade chromadb: pip install 'chromadb>=0.5.0'"
+            )
+            from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
+
+            return DefaultEmbeddingFunction()
+        except Exception as e:
+            _logger.warning(
+                f"Failed to initialize Ollama embedding '{ollama_model}' at {ollama_url}: {e}. "
+                "Falling back to ChromaDB default."
+            )
+            from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
+
+            return DefaultEmbeddingFunction()
+
+    # Sentence-transformers provider (default)
     try:
         from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 
         return SentenceTransformerEmbeddingFunction(model_name=model_name)
     except ImportError:
         _logger.warning(
-            "sentence-transformers not installed. Chinese semantic search will not work. "
+            "sentence-transformers not installed. Multilingual semantic search will not work. "
             "Install with: pip install 'mempalace[multilingual]'"
         )
         from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
