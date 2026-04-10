@@ -169,7 +169,6 @@ ALL_MARKERS = {
 }
 
 
-
 # =============================================================================
 # SENTIMENT — for disambiguation
 # =============================================================================
@@ -290,7 +289,15 @@ def _disambiguate(memory_type: str, text: str, scores: Dict[str, float]) -> str:
         milestone_score = scores.get("milestone", 0)
         if emotional_score > 0.15 and (milestone_score - emotional_score) < 0.15:
             # Check for explicit emotional language
-            emotional_words = {"feel", "love", "proud", "grateful", "happy", "thankful", "appreciate"}
+            emotional_words = {
+                "feel",
+                "love",
+                "proud",
+                "grateful",
+                "happy",
+                "thankful",
+                "appreciate",
+            }
             lower = text.lower()
             if sum(1 for w in emotional_words if w in lower) >= 2:
                 return "emotional"
@@ -431,6 +438,7 @@ def _is_multilingual_available():
     """Check if sentence-transformers is installed."""
     try:
         import sentence_transformers  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -440,10 +448,7 @@ def _score_embedding(prose: str, ef) -> Dict[str, float]:
     """Score prose against memory type descriptions using embedding similarity."""
     mem_embs = _get_memory_embeddings(ef)
     prose_emb = ef([prose[:500]])[0]
-    return {
-        mem_type: _cosine_similarity(prose_emb, emb)
-        for mem_type, emb in mem_embs.items()
-    }
+    return {mem_type: _cosine_similarity(prose_emb, emb) for mem_type, emb in mem_embs.items()}
 
 
 def extract_memories(text: str, min_confidence: float = 0.3) -> List[Dict]:
@@ -466,6 +471,7 @@ def extract_memories(text: str, min_confidence: float = 0.3) -> List[Dict]:
     ef = None
     if use_embedding:
         from .config import get_embedding_function
+
         ef = get_embedding_function()
 
     # Split into paragraphs (double newline or speaker-turn boundaries)

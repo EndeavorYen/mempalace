@@ -25,7 +25,9 @@ def _get_collection(config=None):
     config = config or MempalaceConfig()
     try:
         client = chromadb.PersistentClient(path=config.palace_path)
-        return client.get_collection(config.collection_name, embedding_function=get_embedding_function())
+        return client.get_collection(
+            config.collection_name, embedding_function=get_embedding_function()
+        )
     except Exception:
         return None
 

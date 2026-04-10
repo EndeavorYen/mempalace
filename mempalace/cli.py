@@ -176,7 +176,9 @@ def cmd_repair(args):
     # Try to read existing drawers
     try:
         client = chromadb.PersistentClient(path=palace_path)
-        col = client.get_collection("mempalace_drawers", embedding_function=get_embedding_function())
+        col = client.get_collection(
+            "mempalace_drawers", embedding_function=get_embedding_function()
+        )
         total = col.count()
         print(f"  Drawers found: {total}")
     except Exception as e:
@@ -292,7 +294,9 @@ def cmd_compress(args):
     # Connect to palace
     try:
         client = chromadb.PersistentClient(path=palace_path)
-        col = client.get_collection("mempalace_drawers", embedding_function=get_embedding_function())
+        col = client.get_collection(
+            "mempalace_drawers", embedding_function=get_embedding_function()
+        )
     except Exception:
         print(f"\n  No palace found at {palace_path}")
         print("  Run: mempalace init <dir> then mempalace mine <dir>")

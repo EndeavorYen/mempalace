@@ -318,7 +318,14 @@ class KnowledgeGraph:
             for r in rows
         ]
 
-    def traverse(self, entity_name: str, depth: int = 2, direction: str = "both", as_of: str = None, min_confidence: float = 0.0) -> dict:
+    def traverse(
+        self,
+        entity_name: str,
+        depth: int = 2,
+        direction: str = "both",
+        as_of: str = None,
+        min_confidence: float = 0.0,
+    ) -> dict:
         """BFS traversal from entity. Returns subgraph within depth hops.
 
         Args:
@@ -340,10 +347,14 @@ class KnowledgeGraph:
             frontier = {start_id}
 
             # Fetch starting entity info
-            start_row = conn.execute("SELECT id, name, type FROM entities WHERE id = ?", (start_id,)).fetchone()
+            start_row = conn.execute(
+                "SELECT id, name, type FROM entities WHERE id = ?", (start_id,)
+            ).fetchone()
             nodes = []
             if start_row:
-                nodes.append({"id": start_row[0], "name": start_row[1], "type": start_row[2], "depth": 0})
+                nodes.append(
+                    {"id": start_row[0], "name": start_row[1], "type": start_row[2], "depth": 0}
+                )
 
             edges = []
 
@@ -365,22 +376,28 @@ class KnowledgeGraph:
                             query += " AND t.confidence >= ?"
                             params.append(min_confidence)
 
-                        src_row = conn.execute("SELECT name FROM entities WHERE id = ?", (node_id,)).fetchone()
+                        src_row = conn.execute(
+                            "SELECT name FROM entities WHERE id = ?", (node_id,)
+                        ).fetchone()
                         src_name = src_row[0] if src_row else node_id
 
                         for row in conn.execute(query, params).fetchall():
                             predicate, obj_id, confidence, obj_name, obj_type = row
-                            edges.append({
-                                "subject": src_name,
-                                "predicate": predicate,
-                                "object": obj_name,
-                                "depth": hop,
-                                "confidence": confidence,
-                            })
+                            edges.append(
+                                {
+                                    "subject": src_name,
+                                    "predicate": predicate,
+                                    "object": obj_name,
+                                    "depth": hop,
+                                    "confidence": confidence,
+                                }
+                            )
                             if obj_id not in visited:
                                 visited.add(obj_id)
                                 next_frontier.add(obj_id)
-                                nodes.append({"id": obj_id, "name": obj_name, "type": obj_type, "depth": hop})
+                                nodes.append(
+                                    {"id": obj_id, "name": obj_name, "type": obj_type, "depth": hop}
+                                )
 
                     if direction in ("incoming", "both"):
                         query = """
@@ -396,22 +413,28 @@ class KnowledgeGraph:
                             query += " AND t.confidence >= ?"
                             params.append(min_confidence)
 
-                        tgt_row = conn.execute("SELECT name FROM entities WHERE id = ?", (node_id,)).fetchone()
+                        tgt_row = conn.execute(
+                            "SELECT name FROM entities WHERE id = ?", (node_id,)
+                        ).fetchone()
                         tgt_name = tgt_row[0] if tgt_row else node_id
 
                         for row in conn.execute(query, params).fetchall():
                             predicate, sub_id, confidence, sub_name, sub_type = row
-                            edges.append({
-                                "subject": sub_name,
-                                "predicate": predicate,
-                                "object": tgt_name,
-                                "depth": hop,
-                                "confidence": confidence,
-                            })
+                            edges.append(
+                                {
+                                    "subject": sub_name,
+                                    "predicate": predicate,
+                                    "object": tgt_name,
+                                    "depth": hop,
+                                    "confidence": confidence,
+                                }
+                            )
                             if sub_id not in visited:
                                 visited.add(sub_id)
                                 next_frontier.add(sub_id)
-                                nodes.append({"id": sub_id, "name": sub_name, "type": sub_type, "depth": hop})
+                                nodes.append(
+                                    {"id": sub_id, "name": sub_name, "type": sub_type, "depth": hop}
+                                )
 
                 frontier = next_frontier
                 if not frontier:
@@ -420,7 +443,14 @@ class KnowledgeGraph:
             conn.close()
         return {"nodes": nodes, "edges": edges}
 
-    def find_path(self, entity_a: str, entity_b: str, max_depth: int = 4, as_of: str = None, min_confidence: float = 0.0) -> dict:
+    def find_path(
+        self,
+        entity_a: str,
+        entity_b: str,
+        max_depth: int = 4,
+        as_of: str = None,
+        min_confidence: float = 0.0,
+    ) -> dict:
         """Find shortest path between two entities using BFS.
 
         Returns:
@@ -447,7 +477,9 @@ class KnowledgeGraph:
                 next_frontier = []
 
                 for node_id in frontier:
-                    node_row = conn.execute("SELECT name FROM entities WHERE id = ?", (node_id,)).fetchone()
+                    node_row = conn.execute(
+                        "SELECT name FROM entities WHERE id = ?", (node_id,)
+                    ).fetchone()
                     node_name = node_row[0] if node_row else node_id
 
                     # Outgoing edges
@@ -467,7 +499,11 @@ class KnowledgeGraph:
                     for row in conn.execute(query, params).fetchall():
                         predicate, neighbor_id, confidence, neighbor_name = row
                         if neighbor_id not in parent_triple:
-                            triple = {"subject": node_name, "predicate": predicate, "object": neighbor_name}
+                            triple = {
+                                "subject": node_name,
+                                "predicate": predicate,
+                                "object": neighbor_name,
+                            }
                             parent_triple[neighbor_id] = (node_id, triple)
                             if neighbor_id == end_id:
                                 found = True
@@ -494,7 +530,11 @@ class KnowledgeGraph:
                     for row in conn.execute(query, params).fetchall():
                         predicate, neighbor_id, confidence, neighbor_name = row
                         if neighbor_id not in parent_triple:
-                            triple = {"subject": neighbor_name, "predicate": predicate, "object": node_name}
+                            triple = {
+                                "subject": neighbor_name,
+                                "predicate": predicate,
+                                "object": node_name,
+                            }
                             parent_triple[neighbor_id] = (node_id, triple)
                             if neighbor_id == end_id:
                                 found = True

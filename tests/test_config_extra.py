@@ -2,14 +2,12 @@
 
 import json
 import os
-from unittest.mock import patch
 
 from mempalace.config import (
     MempalaceConfig,
     get_embedding_function,
     _embedding_fn_cache,
     _create_embedding_function,
-    DEFAULT_OLLAMA_URL,
 )
 
 

@@ -92,7 +92,11 @@ class EntityTripleExtractor:
                     }
                 )
 
-        return {"entities_added": entities_added, "triples_added": triples_added, "details": details}
+        return {
+            "entities_added": entities_added,
+            "triples_added": triples_added,
+            "details": details,
+        }
 
     # ── Extraction backends ───────────────────────────────────────────────
 

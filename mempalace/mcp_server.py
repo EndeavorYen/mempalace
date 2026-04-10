@@ -30,7 +30,13 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from .config import MempalaceConfig, get_embedding_function, check_embedding_model_mismatch, sanitize_name, sanitize_content
+from .config import (
+    MempalaceConfig,
+    get_embedding_function,
+    check_embedding_model_mismatch,
+    sanitize_name,
+    sanitize_content,
+)
 from .version import __version__
 from .searcher import search_memories
 from .palace_graph import traverse, find_tunnels, graph_stats
@@ -314,8 +320,9 @@ def tool_taxonomy():
     return tool_get_taxonomy()
 
 
-def tool_search(query: str, limit: int = 5, wing: str = None, room: str = None,
-                snippet_len: int = 200):
+def tool_search(
+    query: str, limit: int = 5, wing: str = None, room: str = None, snippet_len: int = 200
+):
     result = search_memories(
         query,
         palace_path=_config.palace_path,
@@ -550,6 +557,7 @@ def tool_kg_stats():
 def tool_kg_extract(text: str, use_llm: str = "auto"):
     """Extract entities and relationships from text into the knowledge graph."""
     from .kg_extraction import EntityTripleExtractor
+
     extractor = EntityTripleExtractor(_kg, use_llm=use_llm)
     return extractor.extract(text)
 
@@ -834,9 +842,7 @@ def tool_session_restore(project: str = None):
             if results["ids"]:
                 entries = []
                 for doc, meta in zip(results["documents"], results["metadatas"]):
-                    entries.append(
-                        {"content": doc, "timestamp": meta.get("filed_at", "")}
-                    )
+                    entries.append({"content": doc, "timestamp": meta.get("filed_at", "")})
                 entries.sort(key=lambda x: x["timestamp"], reverse=True)
                 recent_checkpoints = [e["content"] for e in entries[:3]]
         except Exception:
@@ -993,8 +999,14 @@ TOOLS = {
         "input_schema": {
             "type": "object",
             "properties": {
-                "text": {"type": "string", "description": "Text to extract entities and relationships from"},
-                "use_llm": {"type": "string", "description": "LLM usage: 'auto' (use if API key available), 'always', 'never' (default: auto)"},
+                "text": {
+                    "type": "string",
+                    "description": "Text to extract entities and relationships from",
+                },
+                "use_llm": {
+                    "type": "string",
+                    "description": "LLM usage: 'auto' (use if API key available), 'always', 'never' (default: auto)",
+                },
             },
             "required": ["text"],
         },
@@ -1006,9 +1018,18 @@ TOOLS = {
             "type": "object",
             "properties": {
                 "entity": {"type": "string", "description": "Starting entity name"},
-                "depth": {"type": "integer", "description": "How many hops to traverse (1-3, default: 2)"},
-                "direction": {"type": "string", "description": "outgoing, incoming, or both (default: both)"},
-                "as_of": {"type": "string", "description": "Date filter — only traverse facts valid at this date (YYYY-MM-DD)"},
+                "depth": {
+                    "type": "integer",
+                    "description": "How many hops to traverse (1-3, default: 2)",
+                },
+                "direction": {
+                    "type": "string",
+                    "description": "outgoing, incoming, or both (default: both)",
+                },
+                "as_of": {
+                    "type": "string",
+                    "description": "Date filter — only traverse facts valid at this date (YYYY-MM-DD)",
+                },
             },
             "required": ["entity"],
         },
@@ -1021,7 +1042,10 @@ TOOLS = {
             "properties": {
                 "entity_a": {"type": "string", "description": "Starting entity"},
                 "entity_b": {"type": "string", "description": "Target entity"},
-                "max_depth": {"type": "integer", "description": "Maximum path length to search (default: 4)"},
+                "max_depth": {
+                    "type": "integer",
+                    "description": "Maximum path length to search (default: 4)",
+                },
             },
             "required": ["entity_a", "entity_b"],
         },
@@ -1065,7 +1089,10 @@ TOOLS = {
                 "limit": {"type": "integer", "description": "Max results (default 5)"},
                 "wing": {"type": "string", "description": "Filter by wing (optional)"},
                 "room": {"type": "string", "description": "Filter by room (optional)"},
-                "snippet_len": {"type": "integer", "description": "Max chars per result (default 200, 0=full text)"},
+                "snippet_len": {
+                    "type": "integer",
+                    "description": "Max chars per result (default 200, 0=full text)",
+                },
             },
             "required": ["query"],
         },
@@ -1265,7 +1292,10 @@ def handle_request(request):
                 return {
                     "jsonrpc": "2.0",
                     "id": req_id,
-                    "error": {"code": -32601, "message": f"Tool '{tool_name}' has been merged into '{new_name}'. Please use '{new_name}' instead."},
+                    "error": {
+                        "code": -32601,
+                        "message": f"Tool '{tool_name}' has been merged into '{new_name}'. Please use '{new_name}' instead.",
+                    },
                 }
             return {
                 "jsonrpc": "2.0",
@@ -1288,7 +1318,16 @@ def handle_request(request):
             return {
                 "jsonrpc": "2.0",
                 "id": req_id,
-                "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2 if os.environ.get("MEMPALACE_DEBUG") else None)}]},
+                "result": {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": json.dumps(
+                                result, indent=2 if os.environ.get("MEMPALACE_DEBUG") else None
+                            ),
+                        }
+                    ]
+                },
             }
         except Exception:
             logger.exception(f"Tool error in {tool_name}")

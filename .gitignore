@@ -13,3 +13,4 @@ mempal.yaml
 # Benchmark reports — generated output, not source
 benchmarks/*_report*.json
 .a5c/
+.coverage

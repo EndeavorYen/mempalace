@@ -1,18 +1,19 @@
 """Integration tests for the full multilingual pipeline."""
 
-import os
-import tempfile
-import shutil
-
-import chromadb
 import pytest
+from conftest import HAS_MULTILINGUAL
 
-from mempalace.config import MempalaceConfig, get_embedding_function
-from mempalace.convo_miner import detect_convo_room
-from mempalace.entity_detector import extract_candidates, score_entity
-from mempalace.general_extractor import extract_memories
-from mempalace.language_detect import detect_language, is_chinese
-from mempalace.spellcheck import spellcheck_user_text
+pytestmark = pytest.mark.skipif(
+    not HAS_MULTILINGUAL,
+    reason="requires sentence-transformers (pip install mempalace[multilingual])",
+)
+
+from mempalace.config import MempalaceConfig, get_embedding_function  # noqa: E402
+from mempalace.convo_miner import detect_convo_room  # noqa: E402
+from mempalace.entity_detector import extract_candidates, score_entity  # noqa: E402
+from mempalace.general_extractor import extract_memories  # noqa: E402
+from mempalace.language_detect import detect_language, is_chinese  # noqa: E402
+from mempalace.spellcheck import spellcheck_user_text  # noqa: E402
 
 
 class TestFullChinesePipeline:

@@ -1,4 +1,5 @@
 """Benchmark tests for KG traversal performance."""
+
 import time
 
 import pytest
@@ -31,6 +32,6 @@ class TestTraversalPerformance:
 
     def test_find_path_10k_under_500ms(self, large_kg):
         start = time.perf_counter()
-        result = large_kg.find_path("entity_0", "entity_500")
+        large_kg.find_path("entity_0", "entity_500")
         elapsed = time.perf_counter() - start
         assert elapsed < 0.5, f"find_path took {elapsed:.3f}s, expected <0.5s"

@@ -448,24 +448,60 @@ CHINESE_SURNAMES = set(
 
 # Common words starting with surname chars that are NOT names
 CHINESE_STOPWORDS = {
-    "王国", "张开", "張開", "李子", "陈述", "陳述", "刘海", "劉海",
-    "黄金", "黃金", "赵钱", "趙錢", "周围", "周末", "周期",
-    "吴语", "吳語", "徐徐", "马上", "馬上", "马路", "馬路",
-    "胡说", "胡乱", "朱红", "何况", "何必", "林立",
-    "高兴", "高興", "高度", "许多", "許多",
+    "王国",
+    "张开",
+    "張開",
+    "李子",
+    "陈述",
+    "陳述",
+    "刘海",
+    "劉海",
+    "黄金",
+    "黃金",
+    "赵钱",
+    "趙錢",
+    "周围",
+    "周末",
+    "周期",
+    "吴语",
+    "吳語",
+    "徐徐",
+    "马上",
+    "馬上",
+    "马路",
+    "馬路",
+    "胡说",
+    "胡乱",
+    "朱红",
+    "何况",
+    "何必",
+    "林立",
+    "高兴",
+    "高興",
+    "高度",
+    "许多",
+    "許多",
 }
 
 CHINESE_PERSON_VERB_PATTERNS = [
-    r"{name}说", r"{name}說",
-    r"{name}问", r"{name}問",
-    r"{name}认为", r"{name}認為",
-    r"{name}觉得", r"{name}覺得",
-    r"{name}告诉", r"{name}告訴",
+    r"{name}说",
+    r"{name}說",
+    r"{name}问",
+    r"{name}問",
+    r"{name}认为",
+    r"{name}認為",
+    r"{name}觉得",
+    r"{name}覺得",
+    r"{name}告诉",
+    r"{name}告訴",
     r"{name}回答",
     r"{name}笑了",
-    r"{name}决定", r"{name}決定",
-    r"{name}喜欢", r"{name}喜歡",
-    r"{name}讨厌", r"{name}討厭",
+    r"{name}决定",
+    r"{name}決定",
+    r"{name}喜欢",
+    r"{name}喜歡",
+    r"{name}讨厌",
+    r"{name}討厭",
 ]
 
 CHINESE_DIALOGUE_PATTERNS = [
@@ -544,11 +580,7 @@ def extract_candidates(text: str) -> dict:
     counts.update(chinese_names)
 
     # Filter: must appear at least 3 times for English, 2 for Chinese
-    return {
-        name: count
-        for name, count in counts.items()
-        if count >= (2 if _is_cjk(name) else 3)
-    }
+    return {name: count for name, count in counts.items() if count >= (2 if _is_cjk(name) else 3)}
 
 
 # ==================== SIGNAL SCORING ====================

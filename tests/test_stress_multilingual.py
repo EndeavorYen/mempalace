@@ -1,14 +1,19 @@
 """Stress tests for multilingual support — edge cases, real-world scenarios, and integration paths."""
 
-import re
 import pytest
+from conftest import HAS_MULTILINGUAL
 
-from mempalace.language_detect import detect_language, detect_chunk_language, is_chinese, get_chinese_ratio
-from mempalace.entity_detector import extract_candidates, score_entity, _extract_chinese_names
-from mempalace.convo_miner import detect_convo_room
-from mempalace.general_extractor import extract_memories, _get_sentiment
-from mempalace.spellcheck import spellcheck_user_text, _should_skip
-from mempalace.config import MempalaceConfig, get_embedding_function
+_skip_no_multilingual = pytest.mark.skipif(
+    not HAS_MULTILINGUAL,
+    reason="requires sentence-transformers (pip install mempalace[multilingual])",
+)
+
+from mempalace.language_detect import detect_language, detect_chunk_language  # noqa: E402
+from mempalace.entity_detector import extract_candidates, score_entity, _extract_chinese_names  # noqa: E402
+from mempalace.convo_miner import detect_convo_room  # noqa: E402
+from mempalace.general_extractor import extract_memories, _get_sentiment  # noqa: E402
+from mempalace.spellcheck import spellcheck_user_text, _should_skip  # noqa: E402
+from mempalace.config import get_embedding_function  # noqa: E402
 
 
 # =============================================================================
@@ -107,7 +112,7 @@ class TestChineseEntityEdgeCases:
         assert "李四" in result
 
     def test_name_adjacent_to_punctuation(self):
-        text = '（张三）说了话。\u201c张三\u201d很开心。张三，你好！'
+        text = "（张三）说了话。\u201c张三\u201d很开心。张三，你好！"
         result = _extract_chinese_names(text)
         assert "张三" in result
 
@@ -154,6 +159,7 @@ class TestChineseEntityEdgeCases:
 # =============================================================================
 
 
+@_skip_no_multilingual
 class TestRoomClassificationEdgeCases:
     def test_empty_content(self):
         assert detect_convo_room("") == "general"
@@ -194,6 +200,7 @@ class TestRoomClassificationEdgeCases:
 # =============================================================================
 
 
+@_skip_no_multilingual
 class TestMemoryExtractionEdgeCases:
     def test_chinese_only_text(self):
         """Pure Chinese text should be extractable."""
@@ -229,7 +236,9 @@ class TestMemoryExtractionEdgeCases:
 
     def test_chinese_emotion_with_english(self):
         # Mixed content about achievement + emotion — genuinely ambiguous
-        text = "I'm really 开心 about this project. 感恩 everyone who helped. 骄傲 of what we built."
+        text = (
+            "I'm really 开心 about this project. 感恩 everyone who helped. 骄傲 of what we built."
+        )
         memories = extract_memories(text, min_confidence=0.1)
         if memories:
             types = [m["memory_type"] for m in memories]
@@ -303,6 +312,7 @@ class TestDialectEdgeCases:
     def test_cjk_topic_extraction(self):
         """dialect._extract_topics should extract CJK bigrams."""
         from mempalace.dialect import Dialect
+
         d = Dialect()
         topics = d._extract_topics("数据库架构设计非常重要，我们需要重新考虑数据库的架构")
         # Should contain CJK topics, not just empty
@@ -311,16 +321,19 @@ class TestDialectEdgeCases:
     def test_mixed_topic_extraction(self):
         """Both English and Chinese topics should be extracted."""
         from mempalace.dialect import Dialect
+
         d = Dialect()
         topics = d._extract_topics("PostgreSQL 数据库的架构设计 using microservices")
         assert len(topics) > 0
 
     def test_english_emotion_signal(self):
         from mempalace.dialect import _EMOTION_SIGNALS
+
         assert "happy" in _EMOTION_SIGNALS
         assert _EMOTION_SIGNALS["happy"] == "joy"
 
     def test_english_flag_signal(self):
         from mempalace.dialect import _FLAG_SIGNALS
+
         assert "decided" in _FLAG_SIGNALS
         assert _FLAG_SIGNALS["decided"] == "DECISION"
